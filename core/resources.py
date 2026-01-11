@@ -17,7 +17,7 @@ Resources are passive descriptions of desired state.
 They must not contain any behavior or domain-specific logic.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from core.types import ResourceType
 
 
@@ -26,9 +26,9 @@ class Resource:
         self, 
         kind: ResourceType, 
         name: str, 
-        namespace: str, 
-        metadata: Dict[str, Any], 
-        spec: Dict[str, Any]
+        namespace: str = "default",
+        metadata: Optional[Dict[str, Any]] = None,
+        spec: Optional[Dict[str, Any]] = None
     ):
         if not isinstance(kind, ResourceType):
             raise ValueError("Invalid resource kind")
