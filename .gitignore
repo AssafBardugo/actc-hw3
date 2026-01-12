@@ -1,5 +1,6 @@
 __pycache__
 .venv
-notes/*
+venv
+notes
 work_plan.md
 _orchestrator.py

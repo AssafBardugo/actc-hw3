@@ -70,7 +70,7 @@ class ResourceStore:
                 return True
             return False
     
-    
+
     def list_by_kind(self, kind: ResourceType) -> Dict[str, Dict[str, Resource]]:
         """List all resources of a kind"""
         with self.lock:

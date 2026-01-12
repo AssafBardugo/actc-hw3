@@ -12,9 +12,11 @@ Important:
 - SHOULD be dependency-free and stable.
 """
 from enum import Enum
+from typing import Tuple
 
 class ResourceType(Enum):
     POD = "pod"
     SERVICE = "service"
     REPLICASET = "replicaSet"
 
+PodIdentity = Tuple[str, str]   # pod is (namespace, name)

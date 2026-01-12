@@ -22,41 +22,36 @@ Critical invariants:
 """
 
 import threading
-from typing import Tuple, Set
-from core.types import ResourceType
-from core.resources import Resource
+from typing import Set
+from core.types import PodIdentity
 
 
 class WorkerRuntime:
     """Manage the actual execution of workers"""
+
     lock: threading.RLock
-    running_pods: Set[Tuple[str, str]]
+    running_pods: Set[PodIdentity]
 
     def __init__(self) -> None:
         self.lock = threading.RLock()
         self.running_pods = set()
 
 
-    def start_pod(self, pod: Resource) -> None:
+    def start_pod(self, pod: PodIdentity) -> None:
         with self.lock:
-            if pod.kind != ResourceType.POD:
-                return
-            self.running_pods.add((pod.namespace, pod.name))
+            self.running_pods.add(pod)
 
 
-    def stop_pod(self, pod: Resource) -> None:
+    def stop_pod(self, pod: PodIdentity) -> None:
         with self.lock:
-            if pod.kind != ResourceType.POD:
-                return
-            self.running_pods.discard((pod.namespace, pod.name))
+            self.running_pods.discard(pod)
 
 
-    def is_running(self, pod: Resource) -> bool:
+    def is_running(self, pod: PodIdentity) -> bool:
         with self.lock:
-            return (pod.namespace, pod.name) in self.running_pods
+            return pod in self.running_pods
 
 
-    def list_running_pods(self) -> Set[Tuple[str, str]]:
-        """return Set[(namespace, name)]"""
+    def list_running_pods(self) -> Set[PodIdentity]:
         with self.lock:
             return self.running_pods.copy()
