@@ -74,4 +74,3 @@ class Resource:
             f"spec={self.spec!r}"
             ")"
         )
-

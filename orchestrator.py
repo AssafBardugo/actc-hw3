@@ -15,12 +15,16 @@ Important:
 - MUST NOT perform reconciliation itself.
 - MUST NOT directly manipulate resources or workers.
 - Acts purely as the system bootstrap / main().
-"""
-import uvicorn
 
-# =============================================================================
-# Main
-# =============================================================================
+DESIGN NOTE:
+
+orchestrator.py is responsible only for wiring components together:
+- initializing stores and runtimes
+- starting controllers
+- starting the HTTP API
+"""
+
+import uvicorn
 
 
 def main():
@@ -33,7 +37,7 @@ def main():
     args = parser.parse_args()
 
     print(f"Starting Orchestrator API on {args.host}:{args.port}")
-    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+    #uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 
 if __name__ == "__main__":

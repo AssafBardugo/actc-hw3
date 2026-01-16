@@ -7,15 +7,15 @@ Responsibility:
 - Stop workers when Pods are deleted.
 - Maintain mapping between Pods and running workers.
 
-Important:
-- MUST reconcile desired Pods against actual runtime state.
-- MUST be idempotent.
-- MUST NOT implement ReplicaSet logic.
-- MUST NOT modify desired state except for Pod-related status if applicable.
-
 Invariant:
 - For every Pod that exists in desired state, exactly one worker is running.
 - For every running worker, there exists a corresponding Pod in desired state.
+
+PodController is responsible only for aligning desired Pod resources
+with the actual runtime state.
+
+It does not create or delete Pods; it only starts and stops workers
+corresponding to existing Pod resources.
 """
 from controllers.base import Controller
 from core.types import ResourceType
