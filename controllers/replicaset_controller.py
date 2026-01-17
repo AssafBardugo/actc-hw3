@@ -62,7 +62,7 @@ class ReplicaSetController(Controller):
             if owner.get("kind") != "replicaset":
                 continue
 
-            if owner.get("name") != replica_set.metadata["name"]:
+            if owner.get("name") != replica_set.name:
                 continue
 
             owned_pods.append(pod)
@@ -79,8 +79,8 @@ class ReplicaSetController(Controller):
             for pod in owned_pods[:to_delete]:
                 self.store.delete(
                     kind=ResourceType.POD,
-                    name=pod.metadata["name"],
-                    namespace=pod.metadata["namespace"],
+                    name=pod.name,
+                    namespace=pod.namespace,
                 )
 
 

@@ -22,8 +22,8 @@ class ResourceStore:
     def create(self, resource: Resource) -> None:
         with self.lock:
             kind = resource.kind
-            namespace = resource.metadata["namespace"]
-            name = resource.metadata["name"]
+            namespace = resource.namespace
+            name = resource.name
 
             if namespace not in self.resources[kind]:
                 self.resources[kind][namespace] = {}
@@ -44,8 +44,8 @@ class ResourceStore:
     def update(self, resource: Resource) -> None:
         with self.lock:
             kind = resource.kind
-            namespace = resource.metadata["namespace"]
-            name = resource.metadata["name"]
+            namespace = resource.namespace
+            name = resource.name
 
             if (
                 namespace not in self.resources[kind]

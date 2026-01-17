@@ -57,13 +57,13 @@ class ServiceController(Controller):
                 continue
 
             if all(labels.get(k) == v for k, v in selector.items()):
-                matched_pods.append(pod.metadata["name"])
+                matched_pods.append(pod.name)
 
         self._set_endpoints(service, matched_pods)
 
 
     def _set_endpoints(self, service, pod_names) -> None:
-        key = (service.metadata["namespace"], service.metadata["name"])
+        key = (service.namespce, service.name)
         self.endpoints[key] = set(pod_names)
 
 
