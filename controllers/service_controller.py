@@ -63,7 +63,7 @@ class ServiceController(Controller):
 
 
     def _set_endpoints(self, service, pod_names) -> None:
-        key = (service.namespce, service.name)
+        key = (service.namespace, service.name)
         self.endpoints[key] = set(pod_names)
 
 
