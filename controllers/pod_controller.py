@@ -20,7 +20,7 @@ corresponding to existing Pod resources.
 from controllers.base import Controller
 from core.types import ResourceType
 from core.store import ResourceStore
-from runtime.workers import WorkerRuntime
+from runtime.podman import PodmanRuntime
 
 
 class PodController(Controller):

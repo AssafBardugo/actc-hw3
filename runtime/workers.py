@@ -23,35 +23,35 @@ Critical invariants:
 
 import threading
 from typing import Set
-from core.types import PodIdentity
+from runtime.podman import PodID
 
 
 class WorkerRuntime:
     """Manage the actual execution of workers"""
 
     lock: threading.RLock
-    running_pods: Set[PodIdentity]
+    running_pods: Set[PodID]
 
     def __init__(self) -> None:
         self.lock = threading.RLock()
         self.running_pods = set()
 
 
-    def start_pod(self, pod: PodIdentity) -> None:
+    def start_pod(self, pod: PodID) -> None:
         with self.lock:
             self.running_pods.add(pod)
 
 
-    def stop_pod(self, pod: PodIdentity) -> None:
+    def stop_pod(self, pod: PodID) -> None:
         with self.lock:
             self.running_pods.discard(pod)
 
 
-    def is_running(self, pod: PodIdentity) -> bool:
+    def is_running(self, pod: PodID) -> bool:
         with self.lock:
             return pod in self.running_pods
 
 
-    def list_running_pods(self) -> Set[PodIdentity]:
+    def list_running_pods(self) -> Set[PodID]:
         with self.lock:
             return self.running_pods.copy()
