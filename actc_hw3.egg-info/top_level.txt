@@ -1,4 +1,0 @@
-api
-controllers
-core
-runtime
