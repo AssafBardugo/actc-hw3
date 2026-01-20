@@ -3,7 +3,7 @@
 Orchestrator Entry Point
 
 Responsibility:
-- Initialize shared state (ResourceStore, WorkerRuntime)
+- Initialize shared state (ResourceStore, PodmanRuntime)
 - Instantiate and start controllers
 - Start the HTTP API server
 
@@ -52,9 +52,9 @@ def main():
     print(f"Starting Orchestrator API on {args.host}:{args.port}")
 
     resource_store = ResourceStore()
-    runtime_worker = WorkerRuntime()
+    podman_runtime = PodmanRuntime()
 
-    pod_controller = PodController(resource_store, runtime_worker)
+    pod_controller = PodController(resource_store, podman_runtime)
     replicaset_controller = ReplicaSetController(resource_store)
     service_controller = ServiceController(resource_store)
 

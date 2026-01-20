@@ -26,7 +26,7 @@ from runtime.podman import PodmanRuntime
 class PodController(Controller):
     """Reconcile desired state with actual state"""
 
-    def __init__(self, store: ResourceStore, runtime: WorkerRuntime):
+    def __init__(self, store: ResourceStore, runtime: PodmanRuntime):
         self.desired_state = store
         self.actual_state = runtime
 
@@ -36,9 +36,9 @@ class PodController(Controller):
         running_pods = self.actual_state.list_running_pods()
 
         for namespace, resources in desired_pods.items():
-            for name in resources:
+            for name, pod in resources.items():
                 if (namespace, name) not in running_pods:
-                    self.actual_state.start_pod((namespace, name))
+                    self.actual_state.start_pod(pod)
 
         for namespace, name in running_pods:
             if not self.desired_state.get(ResourceType.POD, name, namespace):

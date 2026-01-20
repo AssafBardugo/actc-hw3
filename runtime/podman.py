@@ -1,5 +1,5 @@
 import subprocess
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, Set
 from dataclasses import dataclass
 from core.resources import Resource
 from core.types import ResourceType
@@ -16,14 +16,6 @@ class ContainerInfo:
 
 
 class PodmanRuntime:
-    """
-    Podman-backed runtime for Pods.
-
-    This class is responsible ONLY for:
-    - creating containers
-    - starting/stopping containers
-    - querying container state
-    """
 
     def __init__(self):
         self._cache: Dict[PodID, ContainerInfo] = {}
@@ -46,7 +38,7 @@ class PodmanRuntime:
             self._cache[pod_id] = ContainerInfo(
                 container_id=info.container_id,
                 name=container_name,
-                running=True,
+                running=True
             )
             return
 
@@ -82,6 +74,14 @@ class PodmanRuntime:
         container_name = self._container_name_from_id(pod_id)
         info = self._inspect_container(container_name)
         return bool(info and info.running)
+
+
+    def list_running_pods(self) -> Set[PodID]:
+        running_pods = set()
+        for pod_id in self._cache:
+            if self.is_running(pod_id):
+                running_pods.add(pod_id)
+        return running_pods
 
 
     def _container_name(self, pod: Resource) -> str:

@@ -1,4 +1,4 @@
-PYTEST ?= python -m pytest
+PYTEST ?= uv run python -m pytest
 PYTEST_CONFIG ?= tests/pytest.ini
 
 .PHONY: phase1 phase2 phase3 phase4 phase5 all
