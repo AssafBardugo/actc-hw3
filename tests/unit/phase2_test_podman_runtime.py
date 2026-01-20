@@ -40,6 +40,7 @@ def test_start_pod_creates_and_starts_container(monkeypatch):
 def test_start_pod_is_idempotent_when_already_running(monkeypatch):
     runtime = PodmanRuntime()
     pod = _pod()
+    pod_id = (pod.namespace, pod.name)
 
     running_info = ContainerInfo(container_id="abc", name="existing", running=True)
     monkeypatch.setattr(runtime, "_inspect_container", lambda name: running_info)
@@ -49,12 +50,13 @@ def test_start_pod_is_idempotent_when_already_running(monkeypatch):
     runtime.start_pod(pod)
     runtime.start_pod(pod)
 
-    assert runtime._cache[pod.namespace, pod.name].running is True
+    assert runtime._cache[pod_id].running is True
 
 
 def test_start_pod_restarts_stopped_container(monkeypatch):
     runtime = PodmanRuntime()
     pod = _pod()
+    pod_id = (pod.namespace, pod.name)
     calls = {"start": 0}
 
     stopped_info = ContainerInfo(container_id="cid", name="demo", running=False)
@@ -68,7 +70,7 @@ def test_start_pod_restarts_stopped_container(monkeypatch):
 
     runtime.start_pod(pod)
     assert calls["start"] == 1
-    assert runtime._cache[pod.namespace, pod.name].running is True
+    assert runtime._cache[pod_id].running is True
 
 
 def test_stop_pod_is_idempotent(monkeypatch):

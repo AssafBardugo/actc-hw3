@@ -30,16 +30,11 @@ class PodmanRuntime:
 
         info = self._inspect_container(container_name)
 
-        if info and info.running:
-            return  # already running
-
-        if info and not info.running:
-            self._podman_start(container_name)
-            self._cache[pod_id] = ContainerInfo(
-                container_id=info.container_id,
-                name=container_name,
-                running=True
-            )
+        if info:
+            if not info.running:
+                self._podman_start(container_name)
+                info.running = True
+            self._cache[pod_id] = info
             return
 
         image = self._extract_image(pod)
@@ -136,7 +131,7 @@ class PodmanRuntime:
         result = subprocess.run(
             ["podman", "inspect", name],
             capture_output=True,
-            text=True,
+            text=True
         )
 
         if result.returncode != 0:
@@ -148,7 +143,7 @@ class PodmanRuntime:
         return ContainerInfo(
             container_id=data["Id"],
             name=name,
-            running=data["State"]["Running"],
+            running=data["State"]["Running"]
         )
 
 
