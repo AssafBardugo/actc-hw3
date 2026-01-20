@@ -2,8 +2,5 @@ __pycache__
 .venv
 venv
 notes
-work_plan.md
-_orchestrator.py
 actc_hw3.egg-info
 .pytest_cache
-CODEX_TEST_PLAN.md
