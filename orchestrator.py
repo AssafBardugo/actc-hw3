@@ -52,7 +52,7 @@ def main():
     print(f"Starting Orchestrator API on {args.host}:{args.port}")
 
     resource_store = ResourceStore()
-    podman_runtime = PodmanRuntime()
+    podman_runtime = PodmanRuntime(resource_store)
 
     pod_controller = PodController(resource_store, podman_runtime)
     replicaset_controller = ReplicaSetController(resource_store)

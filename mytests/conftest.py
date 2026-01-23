@@ -143,15 +143,17 @@ def make_replicaset() -> Callable[..., Resource]:
 
 
 @pytest.fixture
-def api_client(resource_store: ResourceStore, podman: PodmanRuntime):
+def api_client(resource_store: ResourceStore):
     """Construct a FastAPI test client bound to the current ResourceStore."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
+    podman = PodmanRuntime(resource_store)
+
     try:
         from api.routes import register_routes
-    except Exception as exc:  # pragma: no cover - defensive for early development
-        pytest.skip(f"API routes not yet available ({exc!r})")
+    except Exception as e:
+        pytest.skip(f"API routes not yet available ({e!r})")
 
     app = FastAPI()
     register_routes(app, resource_store, podman)

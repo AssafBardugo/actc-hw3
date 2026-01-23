@@ -1,9 +1,9 @@
 from enum import Enum
 
 class ResourceType(Enum):
-    POD = "pod"
-    SERVICE = "service"
-    REPLICASET = "replicaSet"
+    POD = "Pod"
+    SERVICE = "Service"
+    REPLICASET = "ReplicaSet"
 
 class ResourceStatus(Enum):
     PENDING = "Pending"
