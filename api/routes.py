@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from core.types import ResourceType
 from core.resources import Resource
 from core.store import ResourceStore
-from api.podman import PodmanRuntime
+from runtime.podman import PodmanRuntime
 
 
 def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -> None:
@@ -16,7 +16,9 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
 
 
 
-    ### pods endpoint ###
+    # ================================================================================
+    # POD REQUESTS
+    # ================================================================================
     @app.post("/api/v1/namespaces/{namespace}/pods", status_code=201)
     def create_pod(namespace: str, body: Dict[str, Any]):
         try:
@@ -47,7 +49,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
     def list_pods(namespace: str):
         pods = store.list_by_namespace_and_kind(ResourceType.POD, namespace)
         return {"items": [pod.to_dict() for pod in pods.values()]}
-    
+
 
     @app.get("/api/v1/namespaces/{namespace}/pods/{name}")
     def get_pod(namespace: str, name: str):
@@ -55,6 +57,11 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
         if pod is None:
             raise HTTPException(status_code=404, detail="Pod not found")
         return pod.to_dict()
+
+
+    @app.put("/api/v1/namespaces/{namespace}/pods/{name}")
+    def update_pod(namespace: str, name: str):
+        raise NotImplementedError
 
 
     @app.delete("/api/v1/namespaces/{namespace}/pods/{name}")
@@ -72,7 +79,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
             podman.send2pod(pod, message.get("data"))
 
             return {"status": "Success", "message": "Message sent"}
-        except ValueError as e:
+        except KeyError as e:
             raise HTTPException(409, str(e))
 
 
@@ -81,10 +88,32 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
         try:
             pod = store.get(ResourceType.POD, name, namespace)
 
-            podman.send2pod(pod, message.get("data"), is_call=True)
+            future = podman.call2pod(pod, message.get("data"))
 
-            return {"status": "Success", "message": "Message sent"}
-        except ValueError as e:
+            result = future.result(timeout=message.get("timeout", 30))
+
+            return {"status": "Success", "result": result}
+        except KeyError as e:
+            raise HTTPException(409, str(e))
+        except TimeoutError:
+            raise HTTPException(408, "Request timeout")
+
+
+    @app.get("/api/v1/namespaces/{namespace}/pods/{name}/queue")
+    def get_queue(namespace: str, name: str):
+        try:
+            pod = store.get(ResourceType.POD, name, namespace)
+            return podman.get_queue(pod)
+        except KeyError as e:
+            raise HTTPException(409, str(e))
+
+
+    @app.delete("/api/v1/namespaces/{namespace}/pods/{name}/queue")
+    def clear_queue(namespace: str, name: str):
+        try:
+            pod = store.get(ResourceType.POD, name, namespace)
+            return podman.clear_queue(pod)
+        except KeyError as e:
             raise HTTPException(409, str(e))
 
 
@@ -97,7 +126,64 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
 
 
 
-    ### replica-set endpoint ###
+    # ================================================================================
+    # SERVICE REQUESTS
+    # ================================================================================
+    @app.post("/api/v1/namespaces/{namespace}/services", status_code=201)
+    def create_service(namespace: str, body: Dict[str, Any]):
+        try:
+            metadata = body.get("metadata", {})
+            spec = body.get("spec", {})
+
+            name = metadata.get("name")
+            if not name:
+                raise HTTPException(status_code=400, detail="Service name missing")
+
+            resource = Resource(
+                kind=ResourceType.SERVICE,
+                name=name,
+                namespace=namespace,
+                metadata=metadata,
+                spec=spec,
+            )
+            store.create(resource)
+            return resource.to_dict()
+
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+
+
+    @app.get("/api/v1/namespaces/{namespace}/services")
+    def list_services(namespace: str):
+        services = store.list_by_namespace_and_kind(ResourceType.SERVICE, namespace)
+        return {"items": [svc.to_dict() for svc in services.values()]}
+
+
+    @app.delete("/api/v1/namespaces/{namespace}/services/{name}")
+    def delete_service(namespace: str, name: str):
+        if not store.delete(ResourceType.SERVICE, name, namespace):
+            raise HTTPException(status_code=404, detail="Service not found")
+        return {"deleted": True}
+
+
+    @app.post("/api/v1/namespaces/{namespace}/services/{name}/send")
+    def send_to_service(namespace: str, name: str, body: Dict[str, Any]):
+        raise NotImplementedError
+
+
+    @app.get("/api/v1/namespaces/{namespace}/services/{name}/resolve")
+    def resolve_service(self, service_ref: str, namespace: str = "default") -> Tuple:
+        raise NotImplementedError
+
+    @app.get("/api/v1/namespaces/{namespace}/services/{name}/endpoints")
+    def list_endpoints(namespace: str, name: str) -> Dict[str, Any]:
+        raise NotImplementedError
+
+
+
+    # ================================================================================
+    # REPLICASET REQUESTS
+    # ================================================================================
     @app.post("/api/apps/v1/namespaces/{namespace}/replicasets", status_code=201)
     def create_replicaset(namespace: str, body: Dict[str, Any]):
         try:
@@ -161,56 +247,3 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
         if not store.delete(ResourceType.REPLICASET, name, namespace):
             raise HTTPException(status_code=404, detail="ReplicaSet not found")
         return {"deleted": True}
-    
-
-
-    ### service endpoint ###
-    @app.post("/api/v1/namespaces/{namespace}/services", status_code=201)
-    def create_service(namespace: str, body: Dict[str, Any]):
-        try:
-            metadata = body.get("metadata", {})
-            spec = body.get("spec", {})
-
-            name = metadata.get("name")
-            if not name:
-                raise HTTPException(status_code=400, detail="Service name missing")
-
-            resource = Resource(
-                kind=ResourceType.SERVICE,
-                name=name,
-                namespace=namespace,
-                metadata=metadata,
-                spec=spec,
-            )
-            store.create(resource)
-            return resource.to_dict()
-
-        except ValueError as e:
-            raise HTTPException(status_code=409, detail=str(e))
-
-
-    @app.get("/api/v1/namespaces/{namespace}/services")
-    def list_services(namespace: str):
-        services = store.list_by_namespace_and_kind(ResourceType.SERVICE, namespace)
-        return {"items": [svc.to_dict() for svc in services.values()]}
-
-
-    @app.delete("/api/v1/namespaces/{namespace}/services/{name}")
-    def delete_service(namespace: str, name: str):
-        if not store.delete(ResourceType.SERVICE, name, namespace):
-            raise HTTPException(status_code=404, detail="Service not found")
-        return {"deleted": True}
-
-
-    @app.post("/api/v1/namespaces/{namespace}/services/{name}/send")
-    def send_to_service(namespace: str, name: str, body: Dict[str, Any]):
-        raise NotImplementedError
-
-
-    @app.get("/api/v1/namespaces/{namespace}/services/{name}/resolve")
-    def resolve_service(self, service_ref: str, namespace: str = "default") -> Tuple:
-        raise NotImplementedError
-
-    @app.get("/api/v1/namespaces/{namespace}/services/{name}/endpoints")
-    def list_endpoints(namespace: str, name: str) -> Dict[str, Any]:
-        raise NotImplementedError

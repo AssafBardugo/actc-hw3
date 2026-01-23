@@ -1,7 +1,7 @@
 from controllers.base import Controller
 from core.types import ResourceType
 from core.store import ResourceStore
-from api.podman import PodmanRuntime
+from runtime.podman import PodmanRuntime
 
 
 class PodController(Controller):

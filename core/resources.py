@@ -1,4 +1,3 @@
-import queue
 from typing import Dict, Any, Optional
 from core.types import ResourceType, ResourceStatus
 
@@ -25,8 +24,6 @@ class Resource:
         self.metadata = metadata
         self.spec = spec
         self.status = status
-
-        self.input_queue = queue.Queue()
         self.status["phase"] = ResourceStatus.PENDING
 
 

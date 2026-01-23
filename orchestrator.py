@@ -26,7 +26,7 @@ from fastapi import FastAPI
 
 from core.store import ResourceStore
 from api.routes import register_routes
-from api.podman import PodmanRuntime
+from runtime.podman import PodmanRuntime
 from controllers.base import Controller
 from controllers.pod_controller import PodController
 from controllers.replicaset_controller import ReplicaSetController

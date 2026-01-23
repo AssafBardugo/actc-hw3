@@ -5,12 +5,15 @@ from typing import Optional, Dict, List, Any, Tuple
 from core.resources import Resource
 from core.store import ResourceStore
 from core.types import ResourceType, ResourceStatus
+from runtime.queue import RuntimeQueue
 
 
 class PodmanRuntime:
+    queues: Dict[str, RuntimeQueue]     # map Resource.key() to msg queue
 
     def __init__(self, store: ResourceStore):
         self.store = store
+        self.queues = {}
 
 
     def start_pod(self, pod: Resource) -> None:
@@ -76,7 +79,7 @@ class PodmanRuntime:
             self.store.update_status(pod, ResourceStatus.FAILED)
 
 
-    def send2pod(self, pod: Optional[Resource], value: Any, is_call = False) -> Optional[Future]:
+    def send2pod(self, pod: Optional[Resource], value: Any) -> None:
 
         if not pod or pod.kind != ResourceType.POD:
             raise KeyError("param is not a pod")
@@ -84,12 +87,53 @@ class PodmanRuntime:
         status = self._inspect_container(pod)
 
         if status != ResourceStatus.RUNNING:
-            raise ValueError(f"{pod.key()} not found or not running")
+            raise KeyError(f"{pod.key()} not found or not running")
         
-        future = Future() if is_call else None
-        pod.input_queue.put((value, future))
+        pod_key = pod.key()
+        if pod_key not in self.queues:
+            self.queues[pod_key] = RuntimeQueue()
 
+        self.queues[pod_key].enqueue((value, None))
+
+
+    def call2pod(self, pod: Optional[Resource], value: Any) -> Future:
+
+        if not pod or pod.kind != ResourceType.POD:
+            raise KeyError("param is not a pod")
+
+        status = self._inspect_container(pod)
+
+        if status != ResourceStatus.RUNNING:
+            raise KeyError(f"{pod.key()} not found or not running")
+
+        future = Future()
+
+        pod_key = pod.key()
+        if pod_key not in self.queues:
+            self.queues[pod_key] = RuntimeQueue()
+
+        self.queues[pod_key].enqueue((value, future))
         return future
+
+
+    def get_queue(self, pod: Optional[Resource]) -> Dict[str, Any]:
+
+        if not pod or pod.kind != ResourceType.POD:
+            raise KeyError("param is not a pod")
+
+        status = self._inspect_container(pod)
+
+        items = self.queues[pod.key()].get_items()
+
+        return {"pod": pod.key(), "phase": status, "size": len(items), "items": items}
+
+
+    def clear_queue(self, pod: Optional[Resource]) -> None:
+
+        if not pod or pod.kind != ResourceType.POD:
+            raise KeyError("param is not a pod")
+        
+        self.queues[pod.key()].clear()
 
 
     def send2service(self, service: Resource, value: Any, is_call = False) -> Optional[Future]:
