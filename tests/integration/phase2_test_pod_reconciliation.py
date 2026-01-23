@@ -4,7 +4,7 @@ from controllers.pod_controller import PodController
 from core.resources import Resource
 from core.store import ResourceStore
 from core.types import ResourceType
-from runtime.podman import PodmanRuntime
+from api.podman import PodmanRuntime
 
 pytestmark = [pytest.mark.phase2, pytest.mark.integration]
 

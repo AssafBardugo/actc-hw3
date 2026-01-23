@@ -1,14 +1,7 @@
-# DESIGN NOTE:
-#
-# ResourceStore is intentionally a passive data structure.
-# It does not interpret resource semantics such as ownership,
-# selectors, or reconciliation logic. All such behavior is handled
-# exclusively by controllers.
-
 import threading
 from typing import Dict, Optional
 from core.resources import Resource
-from core.types import ResourceType
+from core.types import ResourceType, ResourceStatus
 
 
 class ResourceStore:
@@ -47,15 +40,24 @@ class ResourceStore:
             namespace = resource.namespace
             name = resource.name
 
-            if (
-                namespace not in self.resources[kind]
-                or name not in self.resources[kind][namespace]
-            ):
-                raise KeyError(
-                    f"{kind}: {namespace}/{name} does not exist"
-                )
+            if namespace not in self.resources[kind] or name not in self.resources[kind][namespace]:
+                raise KeyError(f"{kind}: {namespace}/{name} does not exist")
 
             self.resources[kind][namespace][name] = resource
+    
+
+    def update_status(self, resource: Resource, new_status: ResourceStatus) -> ResourceStatus:
+        with self.lock:
+            kind = resource.kind
+            namespace = resource.namespace
+            name = resource.name
+
+            if namespace not in self.resources[kind] or name not in self.resources[kind][namespace]:
+                raise KeyError(f"{kind}: {namespace}/{name} does not exist")
+            
+            self.resources[kind][namespace][name].status["phase"] = new_status
+
+            return new_status
 
 
     def delete(self, kind: ResourceType, name: str, namespace: str = "default") -> bool:

@@ -1,12 +1,13 @@
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from fastapi import FastAPI, HTTPException
 
 from core.types import ResourceType
 from core.resources import Resource
 from core.store import ResourceStore
+from api.podman import PodmanRuntime
 
 
-def register_routes(app: FastAPI, store: ResourceStore) -> None:
+def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -> None:
     
     # Health check
     @app.get("/healthz")
@@ -21,6 +22,7 @@ def register_routes(app: FastAPI, store: ResourceStore) -> None:
         try:
             metadata = body.get("metadata", {})
             spec = body.get("spec", {})
+            status = body.get("status", {})
 
             name = metadata.get("name")
             if not name:
@@ -32,6 +34,7 @@ def register_routes(app: FastAPI, store: ResourceStore) -> None:
                 namespace=namespace,
                 metadata=metadata,
                 spec=spec,
+                status=status
             )
             store.create(resource)
             return resource.to_dict()
@@ -59,6 +62,38 @@ def register_routes(app: FastAPI, store: ResourceStore) -> None:
         if not store.delete(ResourceType.POD, name, namespace):
             raise HTTPException(status_code=404, detail="Pod not found")
         return {"deleted": True}
+
+
+    @app.post("/api/v1/namespaces/{namespace}/pods/{name}/send")
+    def send_to_pod(namespace: str, name: str, message: Dict[str, Any]):
+        try:
+            pod = store.get(ResourceType.POD, name, namespace)
+
+            podman.send2pod(pod, message.get("data"))
+
+            return {"status": "Success", "message": "Message sent"}
+        except ValueError as e:
+            raise HTTPException(409, str(e))
+
+
+    @app.post("/api/v1/namespaces/{namespace}/pods/{name}/call")
+    def call_pod(namespace: str, name: str, message: Dict[str, Any]):
+        try:
+            pod = store.get(ResourceType.POD, name, namespace)
+
+            podman.send2pod(pod, message.get("data"), is_call=True)
+
+            return {"status": "Success", "message": "Message sent"}
+        except ValueError as e:
+            raise HTTPException(409, str(e))
+
+
+    @app.get("/api/v1/namespaces/{namespace}/pods/{name}/status")
+    def pod_status(namespace: str, name: str) -> Dict[str, Any]:
+        pod = store.get(ResourceType.POD, name, namespace)
+        if pod is None:
+            raise HTTPException(status_code=404, detail="Pod not found")
+        return pod.to_dict()
 
 
 
@@ -165,3 +200,17 @@ def register_routes(app: FastAPI, store: ResourceStore) -> None:
         if not store.delete(ResourceType.SERVICE, name, namespace):
             raise HTTPException(status_code=404, detail="Service not found")
         return {"deleted": True}
+
+
+    @app.post("/api/v1/namespaces/{namespace}/services/{name}/send")
+    def send_to_service(namespace: str, name: str, body: Dict[str, Any]):
+        raise NotImplementedError
+
+
+    @app.get("/api/v1/namespaces/{namespace}/services/{name}/resolve")
+    def resolve_service(self, service_ref: str, namespace: str = "default") -> Tuple:
+        raise NotImplementedError
+
+    @app.get("/api/v1/namespaces/{namespace}/services/{name}/endpoints")
+    def list_endpoints(namespace: str, name: str) -> Dict[str, Any]:
+        raise NotImplementedError

@@ -24,16 +24,16 @@ import time
 import uvicorn
 from fastapi import FastAPI
 
-from api.routes import register_routes
 from core.store import ResourceStore
-from runtime.podman import PodmanRuntime
+from api.routes import register_routes
+from api.podman import PodmanRuntime
 from controllers.base import Controller
 from controllers.pod_controller import PodController
 from controllers.replicaset_controller import ReplicaSetController
 from controllers.service_controller import ServiceController
 
 
-RECONCILE_INTERVAL = 1
+RECONCILE_INTERVAL = 5
 
 def controller_loop(controller: Controller):
     while True:
@@ -63,7 +63,7 @@ def main():
     threading.Thread(target=controller_loop, args=(service_controller,), daemon=True).start()
 
     app = FastAPI()
-    register_routes(app, resource_store)
+    register_routes(app, resource_store, podman_runtime)
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 

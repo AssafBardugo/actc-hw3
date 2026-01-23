@@ -1,42 +1,33 @@
-"""
-Resource Definitions
-
-Responsibility:
-- Define data models for cluster resources (Pod, Service, ReplicaSet).
-- Represent Kubernetes-like objects as pure data structures.
-- Hold metadata and spec fields.
-- Provide lightweight validation helpers if needed.
-
-Important:
-- MUST contain NO side effects.
-- MUST NOT hold global or mutable shared state.
-- MUST NOT start threads or processes.
-- Objects must be safe to copy, compare, and serialize.
-
-Resources are passive descriptions of desired state.
-They must not contain any behavior or domain-specific logic.
-"""
-
+import queue
 from typing import Dict, Any, Optional
-from core.types import ResourceType
+from core.types import ResourceType, ResourceStatus
 
 
 class Resource:
+    """
+    Data model for cluster resources (Pod, Service, ReplicaSet)
+    """
+
     def __init__(
         self, 
         kind: ResourceType, 
         name: str, 
         namespace: str = "default",
-        metadata: Optional[Dict[str, Any]] = None,
-        spec: Optional[Dict[str, Any]] = None
+        metadata: Dict[str, Any] = {},
+        spec: Dict[str, Any] = {},
+        status: Dict[str, Any] = {}
     ):
         if not isinstance(kind, ResourceType):
             raise ValueError("Invalid resource kind")
         self.kind = kind
         self.name = name
         self.namespace = namespace
-        self.metadata = metadata or {}
-        self.spec = spec or {}
+        self.metadata = metadata
+        self.spec = spec
+        self.status = status
+
+        self.input_queue = queue.Queue()
+        self.status["phase"] = ResourceStatus.PENDING
 
 
     def to_dict(self) -> Dict[str, Any]:
@@ -50,6 +41,7 @@ class Resource:
             "kind": self.kind,
             "metadata": metadata,
             "spec": self.spec,
+            "status": self.status
         }
 
 
@@ -74,3 +66,20 @@ class Resource:
             f"spec={self.spec!r}"
             ")"
         )
+
+
+    def copy(self):
+        cloned = Resource(
+            self.kind,
+            self.name,
+            self.namespace,
+            metadata=self.metadata.copy(),
+            spec=self.spec.copy(),
+            status=self.status.copy(),
+        )
+        cloned.input_queue = self.input_queue
+        return cloned
+
+
+    def key(self) -> str:
+        return f"{self.kind}/{self.namespace}/{self.name}"

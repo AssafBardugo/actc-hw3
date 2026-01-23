@@ -11,6 +11,24 @@ import pytest
 pytestmark = [pytest.mark.phase3, pytest.mark.e2e, pytest.mark.podman]
 
 
+# NOTE:
+# Rootless Podman requires a fully functional systemd --user session.
+# On shared machines (like our csl) this is often unavailable.
+# In such cases we skip the E2E test while still validating
+# runtime logic via unit + integration tests.
+def _podman_usable() -> bool:
+    try:
+        subprocess.run(
+            ["podman", "info"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def _wait_for_healthz(base_url: str, timeout: float = 20.0) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -42,6 +60,9 @@ def _wait_for_container(name: str, timeout: float = 90.0) -> None:
 def test_pod_can_call_service_through_cluster_network(e2e_base_url):
     if not shutil.which("podman"):
         pytest.skip("Podman binary not available")
+
+    if not _podman_usable():
+        pytest.skip("Rootless Podman not available in this environment")
 
     env = os.environ.copy()
     proc = subprocess.Popen(

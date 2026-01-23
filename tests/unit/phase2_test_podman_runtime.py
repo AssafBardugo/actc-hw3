@@ -2,7 +2,7 @@ import pytest
 
 from core.resources import Resource
 from core.types import ResourceType
-from runtime.podman import ContainerInfo, PodmanRuntime
+from api.podman import ContainerInfo, PodmanRuntime
 
 pytestmark = [pytest.mark.phase2, pytest.mark.unit]
 

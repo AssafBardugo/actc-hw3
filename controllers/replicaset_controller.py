@@ -1,17 +1,3 @@
-# NOTE:
-# This ReplicaSetController intentionally implements a simplified model.
-#
-# Assumptions:
-# - A ReplicaSet manages only Pods that it created (ownership-based).
-# - Pods are not adopted by ReplicaSets.
-# - ReplicaSet selectors are assumed immutable after creation.
-# - Only owned Pods are counted and reconciled.
-#
-# Rationale:
-# These simplifications avoid unsafe cross-ReplicaSet interference and
-# keep reconciliation deterministic and local, which is sufficient for
-# the scope of this exercise.
-
 from controllers.base import Controller
 from core.types import ResourceType
 from core.resources import Resource
@@ -28,10 +14,8 @@ class ReplicaSetController(Controller):
         all_replica_sets = self.store.list_by_kind(ResourceType.REPLICASET)
 
         for namespace, replica_sets in all_replica_sets.items():
-            pods_in_ns = self.store.list_by_namespace_and_kind(
-                ResourceType.POD,
-                namespace
-            )
+
+            pods_in_ns = self.store.list_by_namespace_and_kind(ResourceType.POD, namespace)
 
             for rs in replica_sets.values():
                 self._reconcile_single_replicaset(rs, pods_in_ns)
@@ -71,8 +55,8 @@ class ReplicaSetController(Controller):
 
         if current < desired_replicas:
             to_create = desired_replicas - current
-            for _ in range(to_create):
-                self._create_pod(replica_set)
+            for i in range(to_create):
+                self._create_pod(replica_set, i)
 
         elif current > desired_replicas:
             to_delete = current - desired_replicas
@@ -84,11 +68,11 @@ class ReplicaSetController(Controller):
                 )
 
 
-    def _create_pod(self, replica_set: Resource) -> None:
+    def _create_pod(self, replica_set: Resource, index: int) -> None:
         rs_name = replica_set.metadata.get("name")
         namespace = replica_set.metadata.get("namespace", "default")
 
-        pod_name = f"{rs_name}-pod-{id(replica_set)}"
+        pod_name = f"{rs_name}-pod-{id(replica_set)}-{index}"
 
         template = replica_set.spec.get("template", {})
         labels = template.get("labels", {})
