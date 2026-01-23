@@ -6,7 +6,7 @@ from typing import Dict, List, Any, Optional, Tuple
 
 class RuntimeQueue:
     items: List[Dict[str, Any]]
-    msg_ids: count[int]
+    msg_ids: count
 
     def __init__(self):
         self.items = []
@@ -36,7 +36,7 @@ class RuntimeQueue:
                 msg["type"] = "send"
             else:
                 msg["type"] = "call"
-                future = msg.pop("future")
+                future: Future = msg.pop("future")
 
                 if future.done():
                     msg["future_status"] = "failed" if future.exception() else "done"

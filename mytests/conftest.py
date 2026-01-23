@@ -1,37 +1,31 @@
 import os
-import shutil
-from typing import Callable, Dict, Optional
-
+from typing import Callable, Dict, Optional, Any
 import pytest
 
 from core.resources import Resource
 from core.store import ResourceStore
 from core.types import ResourceType
+from runtime.podman import PodmanRuntime
 
 
 class RecordingRuntime:
     """Simple runtime stub that records start/stop calls without side effects."""
 
     def __init__(self):
-        self.started: list[Resource] = []
-        self.stopped: list[tuple[str, str]] = []
-        self._running: set[tuple[str, str]] = set()
+        self.started: list[str] = []
+        self.stopped: list[str] = []
+        self._running: set[str] = set()
 
-    def start_pod(self, pod: Resource) -> None:
-        self.started.append(pod)
-        self._running.add((pod.namespace, pod.name))
+    def start_resource(self, resource_id: str) -> None:
+        self.started.append(resource_id)
+        self._running.add(resource_id)
 
-    def stop_pod(self, pod_id: tuple[str, str]) -> None:
-        self.stopped.append(pod_id)
-        self._running.discard(pod_id)
+    def stop_resource(self, resource_id: str) -> None:
+        self.stopped.append(resource_id)
+        self._running.discard(resource_id)
 
-    def list_running_pods(self):
+    def list_running_resources(self):
         return set(self._running)
-
-
-@pytest.fixture
-def resource_store() -> ResourceStore:
-    return ResourceStore()
 
 
 @pytest.fixture
@@ -40,14 +34,21 @@ def runtime_stub() -> RecordingRuntime:
 
 
 @pytest.fixture
+def resource_store() -> ResourceStore:
+    return ResourceStore()
+
+
+@pytest.fixture
 def make_pod() -> Callable[..., Resource]:
     def _make(
-        name: str = "pod-1",
+        name: str,
         namespace: str = "default",
         labels: Optional[Dict[str, str]] = None,
         image: str = "alpine:latest",
         env: Optional[Dict[str, str]] = None,
+        status: Dict[str, Any] = {}
     ) -> Resource:
+
         metadata: Dict[str, object] = {"name": name, "namespace": namespace}
         if labels:
             metadata["labels"] = labels
@@ -61,21 +62,25 @@ def make_pod() -> Callable[..., Resource]:
             namespace=namespace,
             metadata=metadata,
             spec=spec,
+            status=status
         )
-
     return _make
 
 
 @pytest.fixture
 def make_service() -> Callable[..., Resource]:
     def _make(
-        name: str = "svc-1",
+        name: str,
         namespace: str = "default",
         selector: Optional[Dict[str, str]] = None,
         ports: Optional[list[dict]] = None,
+        service_type: str = "default_type",
+        status: Dict[str, Any] = {}
     ) -> Resource:
+
         metadata: Dict[str, object] = {"name": name, "namespace": namespace}
         spec = {
+            "type": service_type,
             "selector": selector or {},
             "ports": ports
             or [
@@ -84,8 +89,7 @@ def make_service() -> Callable[..., Resource]:
                     "port": 80,
                     "targetPort": 8080,
                 }
-            ],
-            "type": "ClusterIP",
+            ]
         }
         return Resource(
             kind=ResourceType.SERVICE,
@@ -93,34 +97,39 @@ def make_service() -> Callable[..., Resource]:
             namespace=namespace,
             metadata=metadata,
             spec=spec,
+            status=status
         )
-
     return _make
 
 
 @pytest.fixture
-def make_replicaset(make_pod: Callable[..., Resource]) -> Callable[..., Resource]:
+def make_replicaset() -> Callable[..., Resource]:
     def _make(
-        name: str = "rs-1",
+        name: str,
         namespace: str = "default",
         replicas: int = 1,
-        selector: Optional[Dict[str, str]] = None,
+        selector: Dict[str, str] = {},
         template_labels: Optional[Dict[str, str]] = None,
-        pod_image: str = "alpine:latest",
+        pod_name: str = "pod_name",
+        pod_image: str = "pod_image",
+        status: Dict[str, Any] = {}
     ) -> Resource:
+
         metadata: Dict[str, object] = {"name": name, "namespace": namespace}
         template = {
-            "metadata": {"labels": template_labels or selector or {"app": name}},
+            "metadata": {
+                "labels": template_labels or selector
+            },
             "spec": {
                 "containers": [
-                    {"name": name, "image": pod_image},
+                    {"name": pod_name, "image": pod_image}
                 ]
-            },
+            }
         }
         spec = {
             "replicas": replicas,
-            "selector": selector or {"app": name},
-            "template": template,
+            "selector": selector,
+            "template": template
         }
         return Resource(
             kind=ResourceType.REPLICASET,
@@ -128,13 +137,13 @@ def make_replicaset(make_pod: Callable[..., Resource]) -> Callable[..., Resource
             namespace=namespace,
             metadata=metadata,
             spec=spec,
+            status=status
         )
-
     return _make
 
 
 @pytest.fixture
-def api_client(resource_store: ResourceStore):
+def api_client(resource_store: ResourceStore, podman: PodmanRuntime):
     """Construct a FastAPI test client bound to the current ResourceStore."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
@@ -145,14 +154,8 @@ def api_client(resource_store: ResourceStore):
         pytest.skip(f"API routes not yet available ({exc!r})")
 
     app = FastAPI()
-    register_routes(app, resource_store)
+    register_routes(app, resource_store, podman)
     return TestClient(app)
-
-
-def require_podman() -> None:
-    """Helper to skip tests when podman is unavailable in the environment."""
-    if not shutil.which("podman"):
-        pytest.skip("Podman binary not found; real-container tests require podman")
 
 
 @pytest.fixture(scope="session")

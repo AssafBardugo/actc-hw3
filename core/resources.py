@@ -24,7 +24,8 @@ class Resource:
         self.metadata = metadata
         self.spec = spec
         self.status = status
-        self.status["phase"] = ResourceStatus.PENDING
+        if kind == ResourceType.POD:
+            self.status["phase"] = ResourceStatus.PENDING
 
 
     def to_dict(self) -> Dict[str, Any]:
@@ -74,7 +75,6 @@ class Resource:
             spec=self.spec.copy(),
             status=self.status.copy(),
         )
-        cloned.input_queue = self.input_queue
         return cloned
 
 
