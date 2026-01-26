@@ -3,7 +3,7 @@ import pytest
 from controllers.pod_controller import PodController
 from controllers.replicaset_controller import ReplicaSetController
 from controllers.service_controller import ServiceController
-from core.types import ResourceType
+from actual_state.types import ResourceType
 
 pytestmark = [pytest.mark.phase1, pytest.mark.unit]
 

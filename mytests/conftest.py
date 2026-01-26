@@ -2,10 +2,10 @@ import os
 from typing import Callable, Dict, Optional, Any
 import pytest
 
-from core.resources import Resource
-from core.store import ResourceStore
-from core.types import ResourceType
-from runtime.podman import PodmanRuntime
+from actual_state.resources import Resource
+from actual_state.store import ResourceStore
+from actual_state.types import ResourceType
+from api_runtime.podman import PodmanRuntime
 
 
 class RecordingRuntime:
@@ -151,7 +151,7 @@ def api_client(resource_store: ResourceStore):
     podman = PodmanRuntime(resource_store)
 
     try:
-        from api.routes import register_routes
+        from api_runtime.routes import register_routes
     except Exception as e:
         pytest.skip(f"API routes not yet available ({e!r})")
 

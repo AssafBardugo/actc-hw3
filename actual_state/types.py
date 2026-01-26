@@ -5,7 +5,7 @@ class ResourceType(Enum):
     SERVICE = "Service"
     REPLICASET = "ReplicaSet"
 
-class ResourceStatus(Enum):
+class PodStatus(Enum):
     PENDING = "Pending"
     RUNNING = "Running"
     SUCCEEDED = "Succeeded"

@@ -1,8 +1,8 @@
 import threading
 from typing import Dict, Optional, Any
-from core.resources import Resource
-from core.types import ResourceType, ResourceStatus
-from runtime.queue import RuntimeQueue
+from actual_state.resources import Resource
+from actual_state.types import ResourceType, PodStatus
+from api_runtime.queue import RuntimeQueue
 
 
 class ResourceStore:
@@ -45,9 +45,9 @@ class ResourceStore:
                 raise KeyError(f"{kind}: {namespace}/{name} does not exist")
 
             self.resources[kind][namespace][name] = resource
-    
 
-    def update_status(self, resource: Resource, new_status: ResourceStatus) -> ResourceStatus:
+
+    def update_status(self, resource: Resource, new_status: PodStatus) -> PodStatus:
         with self.lock:
             kind = resource.kind
             namespace = resource.namespace

@@ -36,18 +36,17 @@ curl -X POST https://localhost:3000/api/v1/namespaces/default/pods   \
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
-                "name": "health-service"
+                "name": "health-service"    # Service name
             },
             "spec": {
-                "selector": {
+                "selector": {   # Which pods belong to this service
                     "app": "health"
                 },
-                "ports": [{
-                    "protocol": "TCP",
-                    "port": 2000,
-                    "targetPort": 5000
+                "ports": [{     
+                    "port": 2000,           # Port the service listens on
+                    "targetPort": 5000      # Port on the pod container
                 }],
-                "type": "ClusterIP"
+                "type": "ClusterIP"     # How the service is exposed, Only ClusterIP is relevant.
             }
         }'
 

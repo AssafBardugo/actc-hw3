@@ -1,7 +1,7 @@
 from controllers.base import Controller
-from core.types import ResourceType
-from core.resources import Resource
-from core.store import ResourceStore
+from actual_state.types import ResourceType
+from actual_state.resources import Resource
+from actual_state.store import ResourceStore
 
 
 class ReplicaSetController(Controller):

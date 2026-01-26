@@ -1,9 +1,9 @@
 import pytest
 import threading
 
-from core.types import ResourceType, ResourceStatus
-from core.resources import Resource
-from core.store import ResourceStore
+from actual_state.types import ResourceType, ResourceStatus
+from actual_state.resources import Resource
+from actual_state.store import ResourceStore
 
 pytestmark = [pytest.mark.unit]
 

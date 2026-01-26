@@ -1,10 +1,10 @@
 import pytest
 
 from controllers.pod_controller import PodController
-from core.resources import Resource
-from core.store import ResourceStore
-from core.types import ResourceType
-from runtime.podman import PodmanRuntime
+from actual_state.resources import Resource
+from actual_state.store import ResourceStore
+from actual_state.types import ResourceType
+from api_runtime.podman import PodmanRuntime
 
 pytestmark = [pytest.mark.phase2, pytest.mark.integration]
 

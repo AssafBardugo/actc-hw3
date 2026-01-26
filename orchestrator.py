@@ -24,9 +24,9 @@ import time
 import uvicorn
 from fastapi import FastAPI
 
-from core.store import ResourceStore
-from api.routes import register_routes
-from runtime.podman import PodmanRuntime
+from actual_state.store import ResourceStore
+from api_runtime.routes import register_routes
+from api_runtime.podman import PodmanRuntime
 from controllers.base import Controller
 from controllers.pod_controller import PodController
 from controllers.replicaset_controller import ReplicaSetController

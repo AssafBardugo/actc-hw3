@@ -1,6 +1,6 @@
 import pytest
 from controllers.replicaset_controller import ReplicaSetController
-from core.types import ResourceType
+from actual_state.types import ResourceType
 
 pytestmark = [pytest.mark.phase4, pytest.mark.integration, pytest.mark.email_edge_cases]
 

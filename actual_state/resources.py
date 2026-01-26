@@ -1,5 +1,5 @@
 from typing import Dict, Any, Optional
-from core.types import ResourceType, ResourceStatus
+from actual_state.types import ResourceType, PodStatus
 
 
 class Resource:
@@ -8,24 +8,24 @@ class Resource:
     """
 
     def __init__(
-        self, 
-        kind: ResourceType, 
-        name: str, 
+        self,
+        kind: ResourceType,
+        name: str,
         namespace: str = "default",
-        metadata: Dict[str, Any] = {},
-        spec: Dict[str, Any] = {},
-        status: Dict[str, Any] = {}
+        metadata: Optional[Dict[str, Any]] = None,
+        spec: Optional[Dict[str, Any]] = None,
+        status: Optional[Dict[str, Any]] = None
     ):
         if not isinstance(kind, ResourceType):
             raise ValueError("Invalid resource kind")
         self.kind = kind
         self.name = name
         self.namespace = namespace
-        self.metadata = metadata
-        self.spec = spec
-        self.status = status
-        if kind == ResourceType.POD:
-            self.status["phase"] = ResourceStatus.PENDING
+        self.metadata = metadata or {}
+        self.spec = spec or {}
+        self.status = status or {}
+        if kind == ResourceType.POD and "phase" not in self.status:
+            self.status["phase"] = PodStatus.PENDING    # test friendly
 
 
     def to_dict(self) -> Dict[str, Any]:
