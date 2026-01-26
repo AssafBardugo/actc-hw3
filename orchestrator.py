@@ -1,23 +1,4 @@
 #!/usr/bin/env python3
-"""
-Orchestrator Entry Point
-
-Responsibility:
-- Initialize shared state (ResourceStore, PodmanRuntime)
-- Instantiate and start controllers
-- Start the HTTP API server
-
-Important:
-- No business logic is implemented here
-- No reconciliation logic is implemented here
-- This file acts as the system entry point only
-
-DESIGN NOTE:
-orchestrator.py is responsible only for wiring components together:
-- initializing stores and runtimes
-- starting controllers
-- starting the HTTP API
-"""
 import argparse
 import threading
 import time
@@ -25,15 +6,16 @@ import uvicorn
 from fastapi import FastAPI
 
 from actual_state.store import ResourceStore
-from api_runtime.routes import register_routes
-from api_runtime.podman import PodmanRuntime
 from controllers.base import Controller
 from controllers.pod_controller import PodController
 from controllers.replicaset_controller import ReplicaSetController
 from controllers.service_controller import ServiceController
+from api_runtime.podman import PodmanRuntime
+from api_runtime.routes import register_routes
+from api_runtime.proxy import ServiceProxyManager
 
 
-RECONCILE_INTERVAL = 5
+RECONCILE_INTERVAL = 3
 
 def controller_loop(controller: Controller):
     while True:
@@ -64,6 +46,9 @@ def main():
 
     app = FastAPI()
     register_routes(app, resource_store, podman_runtime)
+
+    proxy_manager = ServiceProxyManager(app, resource_store, args.host, args.port)
+    threading.Thread(target=proxy_manager.run, daemon=True).start()
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
