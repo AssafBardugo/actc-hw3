@@ -12,20 +12,20 @@ class RecordingRuntime:
     """Simple runtime stub that records start/stop calls without side effects."""
 
     def __init__(self):
-        self.started: list[str] = []
-        self.stopped: list[str] = []
-        self._running: set[str] = set()
+        self.started: list[Resource] = []
+        self.stopped: list[Resource] = []
+        self._running: dict[tuple[str, str], Resource] = {}
 
-    def start_resource(self, resource_id: str) -> None:
-        self.started.append(resource_id)
-        self._running.add(resource_id)
+    def start_pod(self, pod: Resource) -> None:
+        self.started.append(pod)
+        self._running[(pod.namespace, pod.name)] = pod
 
-    def stop_resource(self, resource_id: str) -> None:
-        self.stopped.append(resource_id)
-        self._running.discard(resource_id)
+    def stop_pod(self, pod: Resource) -> None:
+        self.stopped.append(pod)
+        self._running.pop((pod.namespace, pod.name), None)
 
-    def list_running_resources(self):
-        return set(self._running)
+    def list_running_pods(self):
+        return list(self._running.values())
 
 
 @pytest.fixture
@@ -46,16 +46,24 @@ def make_pod() -> Callable[..., Resource]:
         labels: Optional[Dict[str, str]] = None,
         image: str = "alpine:latest",
         env: Optional[Dict[str, str]] = None,
+        spec: Optional[Dict[str, Any]] = None,
         status: Dict[str, Any] = {}
     ) -> Resource:
 
         metadata: Dict[str, object] = {"name": name, "namespace": namespace}
         if labels:
             metadata["labels"] = labels
+        extra_spec = spec
+        if isinstance(image, dict) and spec is None and env is None:
+            extra_spec = image
+            image = "alpine:latest"
+
         container_spec: Dict[str, object] = {"name": name, "image": image}
         if env:
             container_spec["env"] = env
         spec = {"containers": [container_spec]}
+        if extra_spec:
+            spec.update(extra_spec)
         return Resource(
             kind=ResourceType.POD,
             name=name,
@@ -145,8 +153,11 @@ def make_replicaset() -> Callable[..., Resource]:
 @pytest.fixture
 def api_client(resource_store: ResourceStore):
     """Construct a FastAPI test client bound to the current ResourceStore."""
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
+    try:
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+    except Exception as e:
+        pytest.skip(f"FastAPI test client unavailable ({e!r})")
 
     podman = PodmanRuntime(resource_store)
 

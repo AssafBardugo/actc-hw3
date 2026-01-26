@@ -17,11 +17,13 @@ curl -s -X POST "$ORCHESTRATOR/api/apps/v1/namespaces/$NS/replicasets" \
     "spec": {
       "replicas": 3,
       "selector": {
-        "name": "health"
+        "app": "health"
       },
       "template": {
         "metadata": {
-          "app": "health"
+          "labels": {
+            "app": "health"
+          }
         },
         "spec": {
           "containers": [{

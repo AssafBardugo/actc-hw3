@@ -55,8 +55,8 @@ class ReplicaSetController(Controller):
 
         if current < desired_replicas:
             to_create = desired_replicas - current
-            for i in range(to_create):
-                self._create_pod(replica_set, i)
+            for idx in self._next_pod_indices(replica_set, owned_pods, to_create):
+                self._create_pod(replica_set, idx)
 
         elif current > desired_replicas:
             to_delete = current - desired_replicas
@@ -75,7 +75,7 @@ class ReplicaSetController(Controller):
         pod_name = f"{rs_name}-pod-{id(replica_set)}-{index}"
 
         template = replica_set.spec.get("template", {})
-        labels = template.get("labels", {})
+        labels = template.get("metadata", {}).get("labels", {})
 
         pod = Resource(
             kind=ResourceType.POD,
@@ -92,3 +92,25 @@ class ReplicaSetController(Controller):
         )
 
         self.store.create(pod)
+
+
+    def _next_pod_indices(self, replica_set: Resource, owned_pods: list[Resource], count: int) -> list[int]:
+        rs_name = replica_set.metadata.get("name")
+        prefix = f"{rs_name}-pod-{id(replica_set)}-"
+        used: set[int] = set()
+
+        for pod in owned_pods:
+            if not pod.name.startswith(prefix):
+                continue
+            suffix = pod.name[len(prefix):]
+            if suffix.isdigit():
+                used.add(int(suffix))
+
+        indices: list[int] = []
+        idx = 0
+        while len(indices) < count:
+            if idx not in used:
+                indices.append(idx)
+                used.add(idx)
+            idx += 1
+        return indices

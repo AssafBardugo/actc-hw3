@@ -130,50 +130,6 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
         return {"status": "ok"}
 
     
-    @app.api_route("/{path:path}", methods=["GET", "POST"])     # TODO
-    def host_proxy(path: str, request: Request):
-        """
-        Host -> Service proxy.
-        Example:
-            curl http://localhost:2000/health
-        """
-
-        try:
-            local_port = request.url.port
-            if local_port is None:
-                raise HTTPException(400, "Missing destination port")
-
-            # Find service with matching port
-            services = store.list_by_kind(ResourceType.SERVICE)
-            matched_service = None
-
-            for ns, svc_map in services.items():
-                for svc in svc_map.values():
-                    ports = svc.spec.get("ports", [])
-                    if ports and ports[0].get("port") == local_port:
-                        matched_service = svc
-                        namespace = ns
-                        break
-
-            if matched_service is None:
-                raise HTTPException(404, "No Service bound to this port")
-
-            # Forward path as payload (workers ignore it anyway)
-            result = route_to_service(
-                store,
-                podman,
-                namespace,
-                matched_service.name,
-                payload={"path": path},
-                expect_response=True,
-            )
-
-            return Response(content=str(result))
-
-        except KeyError as e:
-            raise HTTPException(404, str(e))
-
-
     # ================================================================================
     # POD REQUESTS
     # ================================================================================
@@ -230,6 +186,8 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
             return {"status": "Success", "message": "Message sent"}
         except KeyError as e:
             raise HTTPException(409, str(e))
+        except TimeoutError:
+            raise HTTPException(408, "Request timeout")
 
 
     @app.post("/api/v1/namespaces/{namespace}/pods/{name}/call")
@@ -237,34 +195,13 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
         try:
             pod = store.get(ResourceType.POD, name, namespace)
 
-            future = podman.call2pod(pod, message.get("data"))
-
-            result = future.result(timeout=message.get("timeout", 30))
+            result = podman.call2pod(pod, message.get("data"), timeout=message.get("timeout", 30))
 
             return {"status": "Success", "result": result}
         except KeyError as e:
             raise HTTPException(409, str(e))
         except TimeoutError:
             raise HTTPException(408, "Request timeout")
-
-
-    @app.get("/api/v1/namespaces/{namespace}/pods/{name}/queue")
-    def get_pod_queue(namespace: str, name: str):
-        try:
-            pod = store.get(ResourceType.POD, name, namespace)
-            return podman.get_queue(pod)
-        except KeyError as e:
-            raise HTTPException(409, str(e))
-
-
-    @app.delete("/api/v1/namespaces/{namespace}/pods/{name}/queue")
-    def clear_pod_queue(namespace: str, name: str):
-        try:
-            pod = store.get(ResourceType.POD, name, namespace)
-            return podman.clear_queue(pod)
-        except KeyError as e:
-            raise HTTPException(409, str(e))
-
 
     @app.get("/api/v1/namespaces/{namespace}/pods/{name}/status")
     def pod_status(namespace: str, name: str) -> Dict[str, Any]:
@@ -329,11 +266,13 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
             if service is None:
                 raise KeyError(f"Service {namespace}/{name} not found")
 
-            podman.route2service(service, message.get("data"))
+            podman.send2service(service, message.get("data"))
 
             return {"status": "Success", "message": "Message sent"}
         except KeyError as e:
             raise HTTPException(409, str(e))
+        except TimeoutError:
+            raise HTTPException(408, "Request timeout")
 
 
     @app.post("/api/v1/namespaces/{namespace}/services/{name}/call")
@@ -341,34 +280,13 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
         try:
             service = store.get(ResourceType.SERVICE, name, namespace)
 
-            future = podman.call2service(service, message.get("data"))
-
-            result = future.result(timeout=message.get("timeout", 30))
+            result = podman.call2service(service, message.get("data"), timeout=message.get("timeout", 30))
 
             return {"status": "Success", "result": result}
         except KeyError as e:
             raise HTTPException(409, str(e))
         except TimeoutError:
             raise HTTPException(408, "Request timeout")
-
-
-    @app.get("/api/v1/namespaces/{namespace}/services/{name}/queue")
-    def get_service_queue(namespace: str, name: str):
-        try:
-            service = store.get(ResourceType.SERVICE, name, namespace)
-            return podman.get_queue(service)
-        except KeyError as e:
-            raise HTTPException(409, str(e))
-
-
-    @app.delete("/api/v1/namespaces/{namespace}/services/{name}/queue")
-    def clear_service_queue(namespace: str, name: str):
-        try:
-            service = store.get(ResourceType.SERVICE, name, namespace)
-            return podman.clear_queue(service)
-        except KeyError as e:
-            raise HTTPException(409, str(e))
-
 
     @app.get("/api/v1/namespaces/{namespace}/services/{name}/resolve")
     def resolve_service(self, service_ref: str, namespace: str = "default") -> Tuple:
@@ -427,3 +345,60 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
         if not store.delete(ResourceType.REPLICASET, name, namespace):
             raise HTTPException(status_code=404, detail="ReplicaSet not found")
         return {"deleted": True}
+
+
+    # ================================================================================
+    # HOST -> SERVICE PROXY (catch-all, must be registered last)
+    # ================================================================================
+    @app.api_route("/{path:path}", methods=["GET", "POST"])
+    async def host_proxy(path: str, request: Request):
+        """
+        Host -> Service proxy.
+        Example:
+            curl http://localhost:2000/health
+        """
+
+        try:
+            local_port = request.url.port
+            if local_port is None:
+                raise HTTPException(400, "Missing destination port")
+
+            # Find service with matching port
+            services = store.list_by_kind(ResourceType.SERVICE)
+            matched_service = None
+            matched_namespace = None
+
+            for ns, svc_map in services.items():
+                for svc in svc_map.values():
+                    ports = svc.spec.get("ports", [])
+                    if ports and ports[0].get("port") == local_port:
+                        matched_service = svc
+                        matched_namespace = ns
+                        break
+                if matched_service is not None:
+                    break
+
+            if matched_service is None:
+                raise HTTPException(404, "No Service bound to this port")
+
+            body = await request.body()
+            if body:
+                try:
+                    payload = await request.json()
+                except Exception:
+                    payload = body.decode("utf-8", errors="replace")
+            else:
+                payload = {"path": path}
+
+            result = podman.route2service(
+                matched_namespace,
+                matched_service.name,
+                local_port,
+                payload,
+                expect_response=True,
+            )
+
+            return Response(content=str(result))
+
+        except KeyError as e:
+            raise HTTPException(404, str(e))

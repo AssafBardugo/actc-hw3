@@ -17,7 +17,7 @@ wait_for_healthz() {
 
 cleanup_all() {
   pods=$(curl -s "$ORCHESTRATOR/api/v1/namespaces/$NS/pods" \
-    | uv run python3 -c "import sys,json; print(' '.join(p['metadata']['name'] for p in json.load(sys.stdin).get('items',[])))" \
+    | python3 -c "import sys,json; print(' '.join(p['metadata']['name'] for p in json.load(sys.stdin).get('items',[])))" \
     2>/dev/null || true)
 
   for p in $pods; do
@@ -25,7 +25,7 @@ cleanup_all() {
   done
 
   services=$(curl -s "$ORCHESTRATOR/api/v1/namespaces/$NS/services" \
-    | uv run python3 -c "import sys,json; print(' '.join(s['metadata']['name'] for s in json.load(sys.stdin).get('items',[])))" \
+    | python3 -c "import sys,json; print(' '.join(s['metadata']['name'] for s in json.load(sys.stdin).get('items',[])))" \
     2>/dev/null || true)
 
   for s in $services; do
@@ -42,7 +42,7 @@ test_service_selector() {
   # health pod WITH label
   curl -s -X POST "$ORCHESTRATOR/api/v1/namespaces/$NS/pods" -H "Content-Type: application/json" -d '{
     "apiVersion":"v1","kind":"Pod",
-    "metadata":{"name":"health","app":"health"},
+    "metadata":{"name":"health","labels":{"app":"health"}},
     "spec":{"containers":[{"name":"health","image":"health"}]}
   }' >/dev/null
 
@@ -79,9 +79,9 @@ test_replicaset_reconcile() {
     "metadata":{"name":"rs"},
     "spec":{
       "replicas":2,
-      "selector":{"name":"health"},
+      "selector":{"app":"health"},
       "template":{
-        "metadata":{"app":"health"},
+        "metadata":{"labels":{"app":"health"}},
         "spec":{"containers":[{"name":"health","image":"health"}]}
       }
     }
@@ -93,7 +93,7 @@ test_replicaset_reconcile() {
 
   # delete one pod
   victim=$(curl -s "$ORCHESTRATOR/api/v1/namespaces/$NS/pods" \
-    | uv run python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['name'])")
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['name'])")
 
   curl -s -X DELETE "$ORCHESTRATOR/api/v1/namespaces/$NS/pods/$victim" >/dev/null
 
@@ -116,9 +116,9 @@ test_replicaset_scale_up() {
     "metadata":{"name":"rs"},
     "spec":{
       "replicas":1,
-      "selector":{"name":"health"},
+      "selector":{"app":"health"},
       "template":{
-        "metadata":{"app":"health"},
+        "metadata":{"labels":{"app":"health"}},
         "spec":{"containers":[{"name":"health","image":"health"}]}
       }
     }
@@ -131,9 +131,9 @@ test_replicaset_scale_up() {
     "metadata":{"name":"rs"},
     "spec":{
       "replicas":3,
-      "selector":{"name":"health"},
+      "selector":{"app":"health"},
       "template":{
-        "metadata":{"app":"health"},
+        "metadata":{"labels":{"app":"health"}},
         "spec":{"containers":[{"name":"health","image":"health"}]}
       }
     }

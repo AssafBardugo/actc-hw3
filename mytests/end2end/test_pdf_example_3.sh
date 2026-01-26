@@ -109,9 +109,9 @@ RS_3='{
   "metadata": { "name": "health-replicaset" },
   "spec": {
     "replicas": 3,
-    "selector": { "name": "health" },
+    "selector": { "app": "health" },
     "template": {
-      "metadata": { "app": "health" },
+      "metadata": { "labels": { "app": "health" } },
       "spec": { "containers": [{ "name": "health", "image": "health:latest" }] }
     }
   }
@@ -123,9 +123,9 @@ RS_5='{
   "metadata": { "name": "health-replicaset" },
   "spec": {
     "replicas": 5,
-    "selector": { "name": "health" },
+    "selector": { "app": "health" },
     "template": {
-      "metadata": { "app": "health" },
+      "metadata": { "labels": { "app": "health" } },
       "spec": { "containers": [{ "name": "health", "image": "health:latest" }] }
     }
   }
@@ -231,7 +231,7 @@ for i in {1..30}; do
 done
 wait
 
-err_count="$(grep -R "__ERR__" -n "$tmpdir" | wc -l | tr -d ' ')"
+err_count="$( (grep -R "__ERR__" -n "$tmpdir" || true) | wc -l | tr -d ' ')"
 [[ "$err_count" -eq 0 ]] || die "Some parallel requests failed ($err_count/30)"
 
 # Ensure non-empty responses
@@ -272,9 +272,9 @@ RS_1='{
   "metadata": { "name": "health-replicaset" },
   "spec": {
     "replicas": 1,
-    "selector": { "name": "health" },
+    "selector": { "app": "health" },
     "template": {
-      "metadata": { "app": "health" },
+      "metadata": { "labels": { "app": "health" } },
       "spec": { "containers": [{ "name": "health", "image": "health:latest" }] }
     }
   }
@@ -286,9 +286,9 @@ RS_4='{
   "metadata": { "name": "health-replicaset" },
   "spec": {
     "replicas": 4,
-    "selector": { "name": "health" },
+    "selector": { "app": "health" },
     "template": {
-      "metadata": { "app": "health" },
+      "metadata": { "labels": { "app": "health" } },
       "spec": { "containers": [{ "name": "health", "image": "health:latest" }] }
     }
   }

@@ -2,7 +2,7 @@
 
 export ORCHESTRATOR=localhost:3000
 
-curl -X POST https://localhost:3000/api/apps/v1/namespaces/default/replicasets   \
+curl -X POST http://localhost:3000/api/apps/v1/namespaces/default/replicasets   \
         -H "Content-Type: application/json" \
         -d '{
             "apiVersion": "apps/v1",
@@ -13,11 +13,13 @@ curl -X POST https://localhost:3000/api/apps/v1/namespaces/default/replicasets  
             "spec": {
                 "replicas": 3,
                 "selector": {
-                    "name": "health"
+                    "app": "health"
                 },
                 "template": {
                     "metadata": {
-                        "app": "health"
+                        "labels": {
+                            "app": "health"
+                        }
                     },
                     "spec": {
                         "containers": [{
@@ -30,7 +32,7 @@ curl -X POST https://localhost:3000/api/apps/v1/namespaces/default/replicasets  
         }'
 
 
-curl -X POST https://localhost:3000/api/v1/namespaces/default/pods   \
+curl -X POST http://localhost:3000/api/v1/namespaces/default/services   \
         -H "Content-Type: application/json" \
         -d '{
             "apiVersion": "v1",
@@ -51,7 +53,7 @@ curl -X POST https://localhost:3000/api/v1/namespaces/default/pods   \
         }'
 
 
-curl -X POST https://localhost:3000/api/v1/namespaces/default/pods   \
+curl -X POST http://localhost:3000/api/v1/namespaces/default/pods   \
         -H "Content-Type: application/json" \
         -d '{
             "apiVersion": "v1",
@@ -72,7 +74,7 @@ curl -X POST https://localhost:3000/api/v1/namespaces/default/pods   \
 
 
 # If we then then ran this, it would cause 2 additional replicas to be created:
-curl -X PUT https://localhost:3000/api/apps/v1/namespaces/default/replicasets/health-replicaset  \
+curl -X PUT http://localhost:3000/api/apps/v1/namespaces/default/replicasets/health-replicaset  \
         -H "Content-Type: application/json" \
         -d '{
             "apiVersion": "apps/v1",
@@ -83,11 +85,13 @@ curl -X PUT https://localhost:3000/api/apps/v1/namespaces/default/replicasets/he
             "spec": {
                 "replicas": 5,
                 "selector": {
-                    "name": "health"
+                    "app": "health"
                 },
                 "template": {
                     "metadata": {
-                        "app": "health"
+                        "labels": {
+                            "app": "health"
+                        }
                     },
                     "spec": {
                         "containers": [{

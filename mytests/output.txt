@@ -1,0 +1,123 @@
+assaf@cs60022r9-12:/home/asafjkl/actc-hw3$ make
+uv run python -m pytest -c mytests/pytest.ini -x -v mytests
+=========================================================== test session starts ============================================================
+platform linux -- Python 3.10.19, pytest-9.0.2, pluggy-1.6.0 -- /home/asafjkl/actc-hw3/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/asafjkl/actc-hw3/mytests
+configfile: pytest.ini
+plugins: anyio-4.12.0
+collected 26 items                                                                                                                         
+
+mytests/integration/test_api.py::test_basic_api PASSED                                                                               [  3%]
+mytests/integration/test_api.py::test_api_supports_replicaset_crud_and_update PASSED                                                 [  7%]
+mytests/new/test_services_e2e.py::test_single_pod_direct_http PASSED                                                                 [ 11%]
+mytests/new/test_services_e2e.py::test_service_routes_to_pod PASSED                                                                  [ 15%]
+mytests/new/test_services_e2e.py::test_service_load_balancing PASSED                                                                 [ 19%]
+mytests/new/test_services_e2e.py::test_scale_up_adds_backends PASSED                                                                 [ 23%]
+mytests/new/test_services_e2e.py::test_selector_excludes_unlabeled_pod PASSED                                                        [ 26%]
+mytests/unit/test_controller_idempotency.py::test_pod_controller_start_is_idempotent PASSED                                          [ 30%]
+mytests/unit/test_controller_idempotency.py::test_pod_controller_stop_is_idempotent PASSED                                           [ 34%]
+mytests/unit/test_controller_idempotency.py::test_service_controller_repeated_reconcile_is_stable PASSED                             [ 38%]
+mytests/unit/test_controller_idempotency.py::test_replicaset_controller_does_not_over_create PASSED                                  [ 42%]
+mytests/unit/test_replicaset_scaling.py::test_scaling_up_creates_new_pods PASSED                                                     [ 46%]
+mytests/unit/test_replicaset_scaling.py::test_scaling_down_removes_only_owned_pods PASSED                                            [ 50%]
+mytests/unit/test_service_controller.py::test_service_controller_selects_pods_by_label PASSED                                        [ 53%]
+mytests/unit/test_service_controller.py::test_service_controller_handles_missing_selector PASSED                                     [ 57%]
+mytests/unit/test_service_controller.py::test_service_controller_reacts_to_label_changes PASSED                                      [ 61%]
+mytests/unit/test_store.py::test_pod_create PASSED                                                                                   [ 65%]
+mytests/unit/test_store.py::test_service_create PASSED                                                                               [ 69%]
+mytests/unit/test_store.py::test_replicaset_create PASSED                                                                            [ 73%]
+mytests/unit/test_store.py::test_list_by PASSED                                                                                      [ 76%]
+mytests/unit/test_store.py::test_delete PASSED                                                                                       [ 80%]
+mytests/unit/test_store.py::test_update PASSED                                                                                       [ 84%]
+mytests/unit/test_store.py::test_resource_store_rejects_duplicate_creation PASSED                                                    [ 88%]
+mytests/unit/test_store.py::test_resource_store_update_requires_existing_resource PASSED                                             [ 92%]
+mytests/unit/test_store.py::test_resource_store_thread_safety_under_concurrent_writes PASSED                                         [ 96%]
+mytests/unit/test_store.py::test_resource_store_delete_reflects_presence PASSED                                                      [100%]
+
+=========================================================== 26 passed in 26.47s ============================================================
+mytests/end2end/test_pdf_example_1.sh
+===> Creating health ReplicaSet (3 replicas)
+{"kind":"ReplicaSet","metadata":{"name":"health-replicaset","namespace":"default"},"spec":{"replicas":3,"selector":{"app":"health"},"template":{"metadata":{"labels":{"app":"health"}},"spec":{"containers":[{"name":"health","image":"health:latest"}]}}},"status":{}}===> Creating health Service
+{"detail":"ResourceType.SERVICE: default/health-service already exists"}===> Creating ping Pod (NO LABELS)
+{"kind":"Pod","metadata":{"name":"ping","namespace":"default","labels":{}},"spec":{"containers":[{"name":"ping","image":"ping:latest","env":{"HEALTH_SERVICE":"health-service:2000"}}]},"status":{"phase":"Pending"}}===> Verifying Service is reachable from host
+PASS: Service reachable from host
+===> Verifying load-balancing across replicas
+Response 1: health-replicaset-pod-140039851299248-0
+Response 2: health-replicaset-pod-140039851299248-0
+Response 3: health-replicaset-pod-140039851299248-2
+Response 4: health-replicaset-pod-140039851299248-1
+Response 5: health-replicaset-pod-140039851299248-1
+PASS: Load balancing detected
+===> Verifying ping pod is NOT part of service
+PASS: ping pod not part of service
+
+🎉 ALL PDF EXAMPLE TESTS PASSED 🎉
+mytests/end2end/test_pdf_example_2.sh
+===> Creating health ReplicaSet (3 replicas)
+{"detail":"ResourceType.REPLICASET: default/health-replicaset already exists"}===> Creating health Service
+{"detail":"ResourceType.SERVICE: default/health-service already exists"}===> Creating ping Pod (NO LABELS)
+{"detail":"ResourceType.POD: default/ping already exists"}===> Updating ReplicaSet to 5 replicas (PDF step)
+{"kind":"ReplicaSet","metadata":{"name":"health-replicaset","namespace":"default"},"spec":{"replicas":5,"selector":{"app":"health"},"template":{"metadata":{"labels":{"app":"health"}},"spec":{"containers":[{"name":"health","image":"health:latest"}]}}},"status":{}}===> Verifying Service still works after scale-up
+PASS: Service reachable after scaling
+===> Verifying load-balancing across scaled replicas
+Response 1: health-replicaset-pod-140039851299248-0
+Response 2: health-replicaset-pod-140039851299248-0
+Response 3: health-replicaset-pod-140039851299248-1
+Response 4: health-replicaset-pod-140039851299248-0
+Response 5: health-replicaset-pod-140039851299248-1
+Response 6: health-pod-140039851648016-0
+Response 7: health-replicaset-pod-140039851299248-1
+Response 8: health-replicaset-pod-140039851299248-2
+PASS: Load balancing still works after scaling
+
+🎉 FULL PDF EXAMPLE (INCLUDING SCALE-UP) PASSED 🎉
+mytests/end2end/test_pdf_example_3.sh
+===> Best-effort cleanup
+===> Create ReplicaSet (3 replicas)
+===> Create Service
+===> Create ping Pod (no labels)
+===> Wait for host access to Service on localhost:2000
+PASS: Service reachable from host (localhost:2000/health)
+===> Load-balancing smoke test (5 requests)
+  Response 1: health-replicaset-pod-140039851299248-1
+  Response 2: health-replicaset-pod-140039851299248-0
+  Response 3: health-replicaset-pod-140039851299248-0
+  Response 4: health-replicaset-pod-140039851299248-0
+  Response 5: health-replicaset-pod-140039825091184-0
+PASS: Load-balancing signal detected (3 unique responses)
+===> Ensure ping isn't accidentally selected by Service selector
+PASS: No obvious evidence of routing to ping in /health responses
+===> Scale ReplicaSet to 5 replicas via PUT (PDF step)
+===> Verify more pods exist after scale-up (3 -> 5)
+WARN: Could not confirm total pod count reached 6 via GET http://localhost:3000/api/v1/namespaces/default/pods (endpoint may differ).
+===> Verify Service still reachable after scaling
+PASS: Service reachable after scaling
+===> Concurrency smoke: 30 parallel requests to Service
+PASS: Parallel request smoke passed (30/30 ok)
+===> Reconciliation: delete one health pod (best-effort) and ensure Service keeps working
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+  File "/usr/lib64/python3.9/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "/usr/lib64/python3.9/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "/usr/lib64/python3.9/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "/usr/lib64/python3.9/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+WARN: Could not identify a health pod by label via GET http://localhost:3000/api/v1/namespaces/default/pods; skipping delete+heal test.
+===> Dynamic endpoints smoke: scale down to 1 then up to 4 quickly
+PASS: Service stayed healthy across quick scale down/up
+
+🎉 ALL TESTS COMPLETED 🎉
+NOTE: Passing this is a *strong* signal, but not a 100% guarantee vs hidden graders.
+mytests/end2end/chatgpt.sh
+TEST 1: Service selector correctness
+✅ PASS: service routes only to labeled pod
+TEST 2: ReplicaSet reconciliation
+✅ PASS: replicaset reconciles correctly
+TEST 3: ReplicaSet scale up
+make: *** [Makefile:20: bash_chatgpt] Error 1
+assaf@cs60022r9-12:/home/asafjkl/actc-hw3$ 

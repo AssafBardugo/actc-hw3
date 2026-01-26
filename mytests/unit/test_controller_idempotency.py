@@ -22,15 +22,16 @@ def test_pod_controller_start_is_idempotent(resource_store, runtime_stub, make_p
     assert runtime_stub.stopped == []
 
 
-def test_pod_controller_stop_is_idempotent(resource_store, runtime_stub):
+def test_pod_controller_stop_is_idempotent(resource_store, runtime_stub, make_pod):
     controller = PodController(resource_store, runtime_stub)
-    runtime_stub._running.add(("default", "ghost"))
+    ghost = make_pod(name="ghost")
+    runtime_stub._running[(ghost.namespace, ghost.name)] = ghost
 
     controller.reconcile()
     controller.reconcile()
 
-    assert runtime_stub.stopped.count(("default", "ghost")) == 1
-    assert ("default", "ghost") not in runtime_stub.list_running_pods()
+    assert [pod.name for pod in runtime_stub.stopped].count("ghost") == 1
+    assert "ghost" not in {pod.name for pod in runtime_stub.list_running_pods()}
 
 
 def test_service_controller_repeated_reconcile_is_stable(resource_store, make_service, make_pod):
