@@ -1,13 +1,16 @@
-from typing import Dict, Any, Tuple, Optional, List
+import random
+import socket
+from typing import Dict, Any, Tuple, Optional, List, Set
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 
+from controllers.service_controller import ServiceController
 from actual_state.types import ResourceType, PodStatus
 from actual_state.resources import Resource
 from actual_state.store import ResourceStore
 from api_runtime.podman import PodmanRuntime
 
-CONTAINER_PORT = 5000
+DEFAULT_CONTAINER_PORT = 5000
 
 
 def validate_pod(namespace: str, body: Dict[str, Any]) -> Resource:
@@ -41,8 +44,14 @@ def validate_pod(namespace: str, body: Dict[str, Any]) -> Resource:
 
     if "phase" not in status or status["phase"] not in PodStatus:
         status["phase"] = PodStatus.PENDING
-    
-    status["containerPort"] = CONTAINER_PORT
+
+    if "hostPort" not in status:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            status["hostPort"] =  int(sock.getsockname()[1])
+
+    if "containerPort" not in status:
+        status["containerPort"] = DEFAULT_CONTAINER_PORT
 
     return Resource(ResourceType.POD, name, namespace, metadata, spec, status)
 
@@ -94,7 +103,10 @@ def validate_replicaset(namespace: str, body: Dict[str, Any]) -> Resource:
         raise KeyError("Service.spec is missing")
     spec = body["spec"]
 
-    if "replicas" not in spec:
+    if "replicas" in spec:
+        if spec["replicas"] < 1:
+            raise KeyError("Service.spec.replicas has to be positive")
+    else:
         spec["replicas"] = 1
 
     if "selector" not in spec or spec["selector"] == {}:
@@ -126,7 +138,7 @@ def validate_replicaset(namespace: str, body: Dict[str, Any]) -> Resource:
 
 
 
-def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -> None:
+def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime, service_controller: ServiceController) -> None:
     
     # Health check
     @app.get("/healthz")
@@ -145,7 +157,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
             store.create(resource)
             return resource.to_dict()
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            print(f"pod was not created since 'body' is not compatible with API_POLICY.md. KeyError: {str(e)}")
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
@@ -168,10 +180,13 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
     def update_pod(namespace: str, name: str, body: Dict[str, Any]):
         try:
             updated_pod = validate_pod(namespace, body)
-            store.update(updated_pod)
+
+            store.delete(ResourceType.POD, name, namespace)      # Can fail silently
+
+            store.create(updated_pod)
             return updated_pod.to_dict()
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            print(f"pod was not updated since 'body' is not compatible with API_POLICY.md. KeyError: {str(e)}")
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
@@ -190,7 +205,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
 
             return {"status": "Success", "message": "Message sent"}
         except KeyError as e:
-            raise HTTPException(409, str(e))
+            return {"status": "Fail", "message": f"KeyError: {str(e)}"}
         except TimeoutError:
             raise HTTPException(408, "Request timeout")
 
@@ -204,7 +219,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
 
             return {"status": "Success", "result": resp}
         except KeyError as e:
-            raise HTTPException(409, str(e))
+            return {"status": "Fail", "message": f"KeyError: {str(e)}"}
         except TimeoutError:
             raise HTTPException(408, "Request timeout")
 
@@ -228,7 +243,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
             store.create(resource)
             return resource.to_dict()
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            print(f"service was not created since 'body' is not compatible with API_POLICY.md. KeyError: {str(e)}")
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
@@ -251,10 +266,13 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
     def update_service(namespace: str, name: str, body: Dict[str, Any]):
         try:
             updated_service = validate_service(namespace, body)
-            store.update(updated_service)
+
+            store.delete(ResourceType.SERVICE, name, namespace)     # Can fail silently
+
+            store.create(updated_service)
             return updated_service.to_dict()
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            print(f"service was not updated since 'body' is not compatible with API_POLICY.md. KeyError: {str(e)}")
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
@@ -273,7 +291,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
                 raise KeyError("param is not a service")
             
             if service.spec["selector"] == {}:
-                raise ValueError(f"{service.key()} is unusable since it dosen't have a selector")
+                return {"status": "Fail", "message": f"{service.key()} is unusable since it dosen't have a selector"}
 
             pod = podman.load_balancer(namespace, service.spec["selector"])
 
@@ -295,7 +313,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
                 raise KeyError("param is not a service")
             
             if service.spec["selector"] == {}:
-                raise ValueError(f"{service.key()} is unusable since it dosen't have a selector")
+                return {"status": "Fail", "message": f"{service.key()} is unusable since it dosen't have a selector"}
 
             pod = podman.load_balancer(namespace, service.spec["selector"])
 
@@ -309,8 +327,8 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
     
 
     @app.get("/api/v1/namespaces/{namespace}/services/{name}/endpoints")
-    def list_endpoints(namespace: str, name: str) -> Dict[str, Any]:
-        raise NotImplementedError
+    def list_endpoints(namespace: str, name: str) -> Set[str]:
+        return service_controller.get_endpoints(namespace, name)
 
 
 
@@ -324,7 +342,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
             store.create(resource)
             return resource.to_dict()
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            print(f"replicaset was not created since 'body' is not compatible with API_POLICY.md. KeyError: {str(e)}")
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
@@ -347,18 +365,31 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
     def update_replicaset(namespace: str, name: str, body: Dict[str, Any]):
         try:
             updated_rs = validate_replicaset(namespace, body)
-            store.update(updated_rs)
+
+            old_rs = store.get(ResourceType.REPLICASET, name, namespace)
+
+            if old_rs:     # Can fail silently
+                for i in range(old_rs.spec["replicas"]):
+                    store.delete(ResourceType.POD, f"own_by_{name}_{i}", namespace)
+                store.delete(ResourceType.REPLICASET, name, namespace)
+
+            store.create(updated_rs)
             return updated_rs.to_dict()
         except KeyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            print(f"replicaset was not updated since 'body' is not compatible with API_POLICY.md. KeyError: {str(e)}")
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
 
     @app.delete("/api/apps/v1/namespaces/{namespace}/replicasets/{name}")
     def delete_replicaset(namespace: str, name: str):
-        if not store.delete(ResourceType.REPLICASET, name, namespace):
-            raise HTTPException(status_code=404, detail="ReplicaSet not found")
+        to_delete = store.get(ResourceType.REPLICASET, name, namespace)
+        if to_delete is None:
+            return {"deleted": False}
+
+        for i in range(to_delete.spec["replicas"]):
+            store.delete(ResourceType.POD, f"own_by_{name}_{i}", namespace)
+        store.delete(ResourceType.REPLICASET, name, namespace)
         return {"deleted": True}
 
 
@@ -375,40 +406,32 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
 
             # Find service with matching port
             services = store.list_by_kind(ResourceType.SERVICE)
-            matched_service = None
-            matched_namespace = None
+            matched_services: List[Resource] = []
 
-            for ns, svc_map in services.items():
+            for svc_map in services.values():
                 for svc in svc_map.values():
-                    ports = svc.spec.get("ports", [])
-                    if ports and ports[0].get("port") == local_port:
-                        matched_service = svc
-                        matched_namespace = ns
-                        break
-                if matched_service is not None:
-                    break
+                    if svc.spec["ports"][0]["port"] == local_port:
+                        matched_services.append(svc)
 
-            if matched_service is None:
+            if not matched_services:
                 raise HTTPException(404, "No Service bound to this port")
+
+            chosen_service = random.choice(matched_services)    # Load balancing
 
             body = await request.body()
             if body:
                 try:
-                    payload = await request.json()
+                    value = await request.json()
                 except Exception:
-                    payload = body.decode("utf-8", errors="replace")
+                    value = body.decode("utf-8", errors="replace")
             else:
-                payload = {"path": path}
+                value = {"path": path}
 
-            result = podman.route2service(
-                matched_namespace,
-                matched_service.name,
-                local_port,
-                payload,
-                expect_response=True,
-            )
+            pod = podman.load_balancer(chosen_service.namespace, chosen_service.spec["selector"])
 
-            return Response(content=str(result))
+            result = podman.send2pod(pod, value, 30)
+
+            return Response(content=result)
 
         except KeyError as e:
             raise HTTPException(404, str(e))

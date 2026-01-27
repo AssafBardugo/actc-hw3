@@ -45,7 +45,7 @@ def main():
     threading.Thread(target=controller_loop, args=(service_controller,), daemon=True).start()
 
     app = FastAPI()
-    register_routes(app, resource_store, podman_runtime)
+    register_routes(app, resource_store, podman_runtime, service_controller)
 
     proxy_manager = ServiceProxyManager(app, resource_store, args.host, args.port)
     threading.Thread(target=proxy_manager.run, daemon=True).start()

@@ -35,18 +35,6 @@ class ResourceStore:
             return self.resources.get(kind, {}).get(namespace, {}).get(name)
 
 
-    def update(self, resource: Resource) -> None:
-        with self.lock:
-            kind = resource.kind
-            namespace = resource.namespace
-            name = resource.name
-
-            if namespace not in self.resources[kind] or name not in self.resources[kind][namespace]:
-                raise KeyError(f"{kind}: {namespace}/{name} does not exist")
-
-            self.resources[kind][namespace][name] = resource
-
-
     def update_status(self, resource: Resource, new_status: PodStatus) -> PodStatus:
         with self.lock:
             kind = resource.kind

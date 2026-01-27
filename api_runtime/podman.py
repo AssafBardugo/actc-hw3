@@ -1,5 +1,4 @@
 import random
-import socket
 import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -39,10 +38,6 @@ class PodmanRuntime:
         if pod.key() in self._fallback_servers:
             self.store.update_status(pod, PodStatus.RUNNING)
             return
-
-        if "hostPort" not in pod.status:
-            pod.status["hostPort"] = self._allocate_host_port()
-            self.store.update(pod)
 
         if not self._podman_available:
             self._start_fallback_server(pod)
@@ -88,11 +83,12 @@ class PodmanRuntime:
         
         except subprocess.CalledProcessError:
             self.store.update_status(pod, PodStatus.FAILED)
+        except Exception as e:
+            print("Unknown exception was thrown: " + str(e))
 
         # except FileNotFoundError:
         #     self._start_fallback_server(pod, host_port)
         #     pod.status["hostPort"] = host_port
-        #     pod.status["containerPort"] = pod.status["containerPort"]
         #     self.store.update(pod)
         #     self.store.update_status(pod, PodStatus.RUNNING)
         #     return
@@ -135,12 +131,6 @@ class PodmanRuntime:
         #         pod.status["containerPort"] = pod.status["containerPort"]
         #         self.store.update(pod)
         #         self.store.update_status(pod, PodStatus.RUNNING)
-
-
-    def _allocate_host_port(self) -> int:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.bind(("127.0.0.1", 0))
-            return int(sock.getsockname()[1])
 
 
     def _start_fallback_server(self, pod: Resource) -> None:
@@ -212,16 +202,13 @@ class PodmanRuntime:
         return resp.text
 
 
-    def load_balancer(self, namespace: str, selector: Dict[str, str]) -> Resource:  # TODO: ensure correctness
+    def load_balancer(self, namespace: str, selector: Dict[str, str]) -> Resource:
 
         pods_in_ns = self.store.list_by_namespace_and_kind(ResourceType.POD, namespace)
 
         matched_pods = []
         for pod in pods_in_ns.values():
-            labels = (pod.metadata or {}).get("labels")
-            if not labels:
-                continue
-            if all(labels.get(k) == v for k, v in selector.items()):
+            if all(pod.metadata["labels"].get(k) == v for k, v in selector.items()):
                 matched_pods.append(pod)
 
         if not matched_pods:
