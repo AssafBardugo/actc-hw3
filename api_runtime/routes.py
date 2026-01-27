@@ -290,7 +290,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
             if not matched_services:
                 raise HTTPException(404, "No Service bound to this port")
 
-            chosen_service = random.choice(matched_services)    # Load balancing
+            chosen_service = random.choice(matched_services)
 
             body = await request.body()
             if body:
@@ -299,11 +299,21 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -
                 except Exception:
                     value = body.decode("utf-8", errors="replace")
             else:
-                value = {"path": path}
+                value = None
 
-            pod = podman.load_balancer(chosen_service.namespace, chosen_service.spec["selector"])
+            pod = podman.load_balancer(
+                chosen_service.namespace,
+                chosen_service.spec["selector"]
+            )
 
-            result = podman.send2pod(pod, value, 30)
+            if request.method == "GET":
+                import requests
+                result = requests.get(
+                    f"http://localhost:{pod.status['hostPort']}/",
+                    timeout=30
+                ).text
+            else:
+                result = podman.send2pod(pod, value, 30)
 
             return Response(content=result)
 

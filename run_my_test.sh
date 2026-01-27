@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-uv run orchestrator.py &
+./setup_images.sh
+
+uv run orchestrator.py >/dev/null 2>&1 &
 ORCH_PID=$!
 
 echo "Started orchestrator.py (pid=$ORCH_PID)"

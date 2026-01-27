@@ -57,8 +57,9 @@ class PodmanRuntime:
 
         container = pod.spec["containers"][0]
         image = container["image"]
+        image = container["image"]
         if "/" not in image:
-            image = f"docker.io/library/{image}"
+            image = f"localhost/{image}"
         env = container.get("env", {}).copy()
         command = container.get("command")
 

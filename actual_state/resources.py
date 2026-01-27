@@ -79,4 +79,4 @@ class Resource:
 
 
     def key(self) -> str:
-        return f"{self.kind}/{self.namespace}/{self.name}"
+        return f"{self.kind}-{self.namespace}-{self.name}"
