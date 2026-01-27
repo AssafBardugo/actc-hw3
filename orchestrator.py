@@ -38,14 +38,14 @@ def main():
 
     pod_controller = PodController(resource_store, podman_runtime)
     replicaset_controller = ReplicaSetController(resource_store)
-    service_controller = ServiceController(resource_store)
+    service_controller = ServiceController(resource_store, podman_runtime)
 
     threading.Thread(target=controller_loop, args=(pod_controller,), daemon=True).start()
     threading.Thread(target=controller_loop, args=(replicaset_controller,), daemon=True).start()
     threading.Thread(target=controller_loop, args=(service_controller,), daemon=True).start()
 
     app = FastAPI()
-    register_routes(app, resource_store, podman_runtime, service_controller)
+    register_routes(app, resource_store, podman_runtime)
 
     proxy_manager = ServiceProxyManager(app, resource_store, args.host, args.port)
     threading.Thread(target=proxy_manager.run, daemon=True).start()

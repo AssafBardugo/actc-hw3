@@ -2,7 +2,7 @@ import random
 import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Optional, Dict, List, Any, Tuple
+from typing import Optional, Dict, List, Any, Tuple, Set
 
 import requests
 
@@ -17,6 +17,7 @@ class PodmanRuntime:
 
     def __init__(self, store: ResourceStore):
         self.store = store
+        self.services_endpoints: Dict[Tuple[str, str], Set[str]] = {}    # (service.namespace, service.name) -> set of pod names
         self._fallback_servers: Dict[str, HTTPServer] = {}
         self._fallback_threads: Dict[str, threading.Thread] = {}
         self._podman_available = self._check_podman_available()
@@ -227,6 +228,10 @@ class PodmanRuntime:
                     running_pods.append(pod)
 
         return running_pods
+
+
+    def get_services_endpoints(self, namespace: str, name: str) -> Set[str]:
+        return self.services_endpoints.get((namespace, name), set())
 
 
     def _inspect_container(self, pod: Resource) -> PodStatus:

@@ -117,4 +117,4 @@ done
 echo "PASS: ping pod not part of service"
 
 echo
-echo "🎉 ALL PDF EXAMPLE TESTS PASSED 🎉"
+echo "ALL PDF EXAMPLE TESTS PASSED"

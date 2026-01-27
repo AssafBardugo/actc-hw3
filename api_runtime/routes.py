@@ -1,10 +1,9 @@
 import random
 import socket
-from typing import Dict, Any, Tuple, Optional, List, Set
+from typing import Dict, Any, List, Set
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 
-from controllers.service_controller import ServiceController
 from actual_state.types import ResourceType, PodStatus
 from actual_state.resources import Resource
 from actual_state.store import ResourceStore
@@ -138,7 +137,7 @@ def validate_replicaset(namespace: str, body: Dict[str, Any]) -> Resource:
 
 
 
-def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime, service_controller: ServiceController) -> None:
+def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime) -> None:
     
     # Health check
     @app.get("/healthz")
@@ -328,7 +327,7 @@ def register_routes(app: FastAPI, store: ResourceStore, podman: PodmanRuntime, s
 
     @app.get("/api/v1/namespaces/{namespace}/services/{name}/endpoints")
     def list_endpoints(namespace: str, name: str) -> Set[str]:
-        return service_controller.get_endpoints(namespace, name)
+        return podman.get_services_endpoints(namespace, name)
 
 
 

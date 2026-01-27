@@ -1,17 +1,15 @@
 from controllers.base import Controller
 from actual_state.types import ResourceType
 from actual_state.store import ResourceStore
-
-from typing import Dict, Tuple, Set, Optional
+from api_runtime.podman import PodmanRuntime
 
 
 class ServiceController(Controller):
     store: ResourceStore
-    endpoints: Dict[Tuple[str, str], Set[str]]  # (service.namespace, service.name) -> set of pod names
 
-    def __init__(self, store: ResourceStore) -> None:
+    def __init__(self, store: ResourceStore, runtime: PodmanRuntime) -> None:
         self.store = store
-        self.endpoints = {}
+        self.desired_state = runtime
 
 
     def reconcile(self) -> None:
@@ -35,8 +33,4 @@ class ServiceController(Controller):
                 if not matched_pods:
                     print(f'Warning: Service {service.name} with the selector {service.spec["selector"]} matches no pods')
                 
-                self.endpoints[(service.namespace, service.name)] = set(matched_pods)
-    
-
-    def get_endpoints(self, namespace: str, name: str) -> Set[str]:
-        return self.endpoints.get((namespace, name), set())
+                self.desired_state.services_endpoints[(service.namespace, service.name)] = set(matched_pods)

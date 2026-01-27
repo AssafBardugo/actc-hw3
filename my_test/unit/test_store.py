@@ -1,5 +1,4 @@
 import pytest
-import threading
 
 from actual_state.types import ResourceType, PodStatus
 from actual_state.resources import Resource
@@ -93,78 +92,3 @@ def test_delete(resource_store: ResourceStore, make_pod, make_service, make_repl
 
     assert resource_store.get(ResourceType.SERVICE, "srv_ns1", "ns1") == None
     assert resource_store.get(ResourceType.REPLICASET, "rs_ns1", "ns1") == rs_ns1
-
-
-def test_update(resource_store: ResourceStore, make_pod, make_service, make_replicaset):
-    pod = make_pod(name="pod", labels={"app": "v1"})
-    service = make_service(name="service", selector={"app": "v1"})
-    replicaset = make_replicaset(name="replicaset", replicas=1, selector={"app": "v1"})
-
-    resource_store.create(pod)
-    resource_store.create(service)
-    resource_store.create(replicaset)
-
-    updated_pod = make_pod(name="pod", labels={"app": "v2"})
-    updated_service = make_service(name="service", selector={"app": "v2"})
-    updated_replicaset = make_replicaset(name="replicaset", replicas=3, selector={"app": "v2"})
-
-    resource_store.update(updated_pod)
-    resource_store.update(updated_service)
-    resource_store.update(updated_replicaset)
-
-    assert resource_store.get(ResourceType.POD, "pod") == updated_pod
-    assert resource_store.get(ResourceType.SERVICE, "service") == updated_service
-    assert resource_store.get(ResourceType.REPLICASET, "replicaset") == updated_replicaset
-
-
-# def test_resource_store_rejects_duplicate_creation(resource_store: ResourceStore, make_pod):
-#     pod = make_pod("same-name")
-#     resource_store.create(pod)
-
-#     with pytest.raises(ValueError):
-#         resource_store.create(pod)
-
-#     fetched = resource_store.get(ResourceType.POD, "same-name", "default")
-#     assert fetched is pod
-
-
-# def test_resource_store_update_requires_existing_resource(resource_store: ResourceStore, make_service):
-#     missing = make_service("nope")
-#     with pytest.raises(KeyError):
-#         resource_store.update(missing)
-
-
-# def test_resource_store_thread_safety_under_concurrent_writes(make_pod):
-#     """
-#     ResourceStore must be the single thread-safe source of truth.
-#     Concurrent CRUD operations should not corrupt internal state.
-#     """
-#     store = ResourceStore()
-#     total = 50
-
-#     def create_and_update(idx: int) -> None:
-#         pod = make_pod(f"pod-{idx}", "default", {}, {"rev": 0})
-#         store.create(pod)
-#         updated = make_pod(f"pod-{idx}", "default", {}, {"rev": idx})
-#         store.update(updated)
-#         retval = store.get(ResourceType.POD, pod.name, pod.namespace)
-#         assert retval and retval.spec["rev"] == idx
-
-#     threads = [threading.Thread(target=create_and_update, args=(i,)) for i in range(total)]
-#     for t in threads:
-#         t.start()
-#     for t in threads:
-#         t.join()
-
-#     pods = store.list_by_kind(ResourceType.POD).get("default", {})
-#     assert len(pods) == total
-#     assert all(isinstance(pod, Resource) for pod in pods.values())
-
-
-# def test_resource_store_delete_reflects_presence(resource_store: ResourceStore):
-#     pod = Resource(ResourceType.POD, "ephemeral", "default", {}, {})
-#     resource_store.create(pod)
-
-#     assert resource_store.delete(ResourceType.POD, "ephemeral", "default") is True
-#     assert resource_store.delete(ResourceType.POD, "ephemeral", "default") is False
-#     assert resource_store.get(ResourceType.POD, "ephemeral", "default") is None

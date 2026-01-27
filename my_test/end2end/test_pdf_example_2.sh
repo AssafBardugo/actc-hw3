@@ -136,4 +136,4 @@ fi
 echo "PASS: Load balancing still works after scaling"
 
 echo
-echo "🎉 FULL PDF EXAMPLE (INCLUDING SCALE-UP) PASSED 🎉"
+echo " FULL PDF EXAMPLE (INCLUDING SCALE-UP) PASSED "

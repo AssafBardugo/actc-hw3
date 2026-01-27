@@ -305,5 +305,4 @@ ok "Service stayed healthy across quick scale down/up"
 rm -rf "$tmpdir" || true
 
 echo
-echo "🎉 ALL TESTS COMPLETED 🎉"
-echo "NOTE: Passing this is a *strong* signal, but not a 100% guarantee vs hidden graders."
+echo " ALL TESTS COMPLETED "

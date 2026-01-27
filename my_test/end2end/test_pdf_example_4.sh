@@ -4,8 +4,8 @@ set -euo pipefail
 ORCHESTRATOR="http://localhost:3000"
 NS="default"
 
-fail() { echo "❌ FAIL: $1"; exit 1; }
-pass() { echo "✅ PASS: $1"; }
+fail() { echo "FAIL: $1"; exit 1; }
+pass() { echo "PASS: $1"; }
 
 wait_for_healthz() {
   for i in {1..30}; do
@@ -206,4 +206,4 @@ test_replicaset_scale_up
 test_message_pipeline
 test_crud_semantics
 
-echo "🎉 ALL END-TO-END TESTS PASSED"
+echo "ALL END-TO-END TESTS PASSED"
