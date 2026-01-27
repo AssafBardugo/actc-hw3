@@ -14,6 +14,7 @@ from api_runtime.podman import PodmanRuntime
 from api_runtime.routes import register_routes
 from api_runtime.proxy import ServiceProxyManager
 
+app = FastAPI()
 
 RECONCILE_INTERVAL = 3
 
@@ -44,7 +45,6 @@ def main():
     threading.Thread(target=controller_loop, args=(replicaset_controller,), daemon=True).start()
     threading.Thread(target=controller_loop, args=(service_controller,), daemon=True).start()
 
-    app = FastAPI()
     register_routes(app, resource_store, podman_runtime)
 
     proxy_manager = ServiceProxyManager(app, resource_store, args.host, args.port)

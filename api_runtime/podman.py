@@ -12,8 +12,6 @@ from actual_state.types import ResourceType, PodStatus
 
 
 class PodmanRuntime:
-    # FALLBACK_IMAGE = "docker.io/library/python:3.11-alpine"
-
 
     def __init__(self, store: ResourceStore):
         self.store = store
@@ -36,45 +34,55 @@ class PodmanRuntime:
         if pod.kind != ResourceType.POD:
             raise KeyError("param is not a pod")
         
+        # If fallback server already running
         if pod.key() in self._fallback_servers:
             self.store.update_status(pod, PodStatus.RUNNING)
             return
 
+        # If podman not available fallback server
         if not self._podman_available:
             self._start_fallback_server(pod)
             self.store.update_status(pod, PodStatus.RUNNING)
             return
 
+        # Inspect current container state
         status = self._inspect_container(pod)
 
-        if status in [PodStatus.RUNNING, PodStatus.SUCCEEDED, PodStatus.FAILED]:
+        if status == PodStatus.RUNNING:
             # Completed/failed pods are not restarted here
             # ReplicaSet will create new pods if needed (k8s-like semantics)
             return
 
         # here status is PENDING, we will create and start
 
-        env = pod.spec["containers"][0].get("env", {})
-        image = pod.spec["containers"][0]["image"]
-        command = pod.spec["containers"][0].get("command")
+        container = pod.spec["containers"][0]
+        image = container["image"]
+        if "/" not in image:
+            image = f"docker.io/library/{image}"
+        env = container.get("env", {}).copy()
+        command = container.get("command")
+
+        env.setdefault("PORT", str(pod.status["containerPort"]))
+        env.setdefault("POD_NAME", pod.name)
+        env.setdefault("POD_NAMESPACE", pod.namespace)
+        env.setdefault("POD_IMAGE", image)
+
+        cmd = ["podman", "create", "--name", pod.key(), "-p", f'{pod.status["hostPort"]}:{pod.status["containerPort"]}']
+
+        for k, v in env.items():
+            cmd += ["-e", f"{k}={v}"]
+        
+        cmd.append(image)
+
+        if command:
+            if isinstance(command, (list, tuple)):
+                cmd.extend([str(arg) for arg in command])
+            else:
+                cmd.append(str(command))
 
         try:
-            env = env.copy()
-            env.setdefault("PORT", str(pod.status["containerPort"]))
-            env.setdefault("POD_NAME", pod.name)
-            env.setdefault("POD_NAMESPACE", pod.namespace)
-            env.setdefault("POD_IMAGE", image)
-
-            cmd = ["podman", "create", "--name", pod.key(), "-p", f'{pod.status["hostPort"]}:{pod.status["containerPort"]}']
-
-            for k, v in env.items():
-                cmd += ["-e", f"{k}={v}"]
-
-            if command:
-                if isinstance(command, (list, tuple)):
-                    cmd.extend([str(arg) for arg in command])
-                else:
-                    cmd.append(str(command))
+            # ensure stale container removed
+            subprocess.run(["podman", "rm", "-f", pod.key()], capture_output=True)
 
             subprocess.run(cmd, capture_output=True, text=True, check=True)
 
@@ -82,62 +90,19 @@ class PodmanRuntime:
 
             self.store.update_status(pod, PodStatus.RUNNING)
         
-        except subprocess.CalledProcessError:
+        # If creation or start failed mark failed
+        except subprocess.CalledProcessError as e:
+            print(e.stderr)
             self.store.update_status(pod, PodStatus.FAILED)
-        except Exception as e:
-            print("Unknown exception was thrown: " + str(e))
-
-        # except FileNotFoundError:
-        #     self._start_fallback_server(pod, host_port)
-        #     pod.status["hostPort"] = host_port
-        #     self.store.update(pod)
-        #     self.store.update_status(pod, PodStatus.RUNNING)
-        #     return
-
-        # except subprocess.CalledProcessError as exc:
-        #     err = (exc.stderr or "").lower()
-        #     missing = (
-        #         "not found" in err
-        #         or "no such image" in err
-        #         or "unable to find" in err
-        #         or "not known" in err
-        #     )
-        #     if not missing:
-        #         self._start_fallback_server(pod, host_port)
-        #         pod.status["hostPort"] = host_port
-        #         pod.status["containerPort"] = pod.status["containerPort"]
-        #         self.store.update(pod)
-        #         self.store.update_status(pod, PodStatus.RUNNING)
-        #         return
-
-        #     try:
-        #         fallback_cmd = self._build_podman_create_cmd(
-        #             pod.key(),
-        #             host_port,
-        #             env,
-        #             self.FALLBACK_IMAGE,
-        #             self._fallback_http_command(),
-        #         )
-        #         subprocess.run(fallback_cmd, capture_output=True, text=True, check=True)
-
-        #         pod.status["hostPort"] = host_port
-        #         pod.status["containerPort"] = pod.status["containerPort"]
-        #         self.store.update(pod)
-
-        #         subprocess.run(["podman", "start", pod.key()], capture_output=True, text=True, check=True)
-        #         self.store.update_status(pod, PodStatus.RUNNING)
-        #     except (subprocess.CalledProcessError, FileNotFoundError):
-        #         self._start_fallback_server(pod, host_port)
-        #         pod.status["hostPort"] = host_port
-        #         pod.status["containerPort"] = pod.status["containerPort"]
-        #         self.store.update(pod)
-        #         self.store.update_status(pod, PodStatus.RUNNING)
+        except Exception:
+            self.store.update_status(pod, PodStatus.FAILED)
 
 
     def _start_fallback_server(self, pod: Resource) -> None:
-
         if pod.key() in self._fallback_servers:
             return
+        
+        self.store.update_status(pod, PodStatus.RUNNING)
 
         class Handler(BaseHTTPRequestHandler):
             def _send(self, body: str) -> None:
@@ -209,6 +174,10 @@ class PodmanRuntime:
 
         matched_pods = []
         for pod in pods_in_ns.values():
+
+            if self._inspect_container(pod) != PodStatus.RUNNING:
+                continue
+
             if all(pod.metadata["labels"].get(k) == v for k, v in selector.items()):
                 matched_pods.append(pod)
 
@@ -236,8 +205,15 @@ class PodmanRuntime:
 
     def _inspect_container(self, pod: Resource) -> PodStatus:
 
-        if pod.key() in self._fallback_servers or not self._podman_available:
+        # If podman is unavailable, only treat the pod as running
+        # when a fallback server has actually been started.
+        if pod.key() in self._fallback_servers:
             return self.store.update_status(pod, PodStatus.RUNNING)
+
+        if not self._podman_available:
+            if pod.key() in self._fallback_servers:
+                return self.store.update_status(pod, PodStatus.RUNNING)
+            return self.store.update_status(pod, PodStatus.PENDING)
 
         try:
             result = subprocess.run(["podman", "inspect", pod.key()], capture_output=True, text=True)

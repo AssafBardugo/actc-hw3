@@ -2,6 +2,7 @@ from controllers.base import Controller
 from actual_state.types import ResourceType
 from actual_state.resources import Resource
 from actual_state.store import ResourceStore
+from api_runtime.validate_resource import validate_pod
 
 
 class ReplicaSetController(Controller):
@@ -26,4 +27,13 @@ class ReplicaSetController(Controller):
                     pod_name = f"own_by_{rs.name}_{i}"
 
                     if not self.store.get(ResourceType.POD, pod_name, namespace):
-                        self.store.create(Resource(ResourceType.POD, pod_name, namespace, {"labels": rs.spec["template"]["metadata"]["labels"]}, rs.spec["template"]["spec"]))
+                        body = {
+                            "kind": "Pod",
+                            "metadata": {
+                                "name": pod_name,
+                                "labels": rs.spec["template"]["metadata"]["labels"]
+                            },
+                            "spec": rs.spec["template"]["spec"]
+                        }
+                        pod = validate_pod(namespace, body)
+                        self.store.create(pod)

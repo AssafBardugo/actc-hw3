@@ -2,7 +2,6 @@ import threading
 from typing import Dict, Optional, Any
 from actual_state.resources import Resource
 from actual_state.types import ResourceType, PodStatus
-from api_runtime.queue import RuntimeQueue
 
 
 class ResourceStore:
